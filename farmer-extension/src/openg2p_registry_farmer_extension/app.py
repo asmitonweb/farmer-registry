@@ -121,6 +121,9 @@ class Initializer(BaseInitializer):
             _logger.warning(f"Failed to patch FilterBuilder: {e}")
 
     async def fastapi_app_startup(self, app):
+        from .api_analytics import router as analytics_router
+        app.include_router(analytics_router)
+        
         # The explicit CLI `migrate` step is a separate invocation from
         # serving traffic (see the image's CMD: "migrate; gunicorn ...").
         # Deployments that override the container command/args can skip that
