@@ -2,7 +2,7 @@
 
 Everything needed to build, deploy, upgrade, verify, roll back and debug the
 Farmer Registry on the `far` namespace of the dev and staging clusters. Written
-against the repo as of 2026-09-17 (`develop` @ PR #31 merged, PR #33 open).
+against the repo as of 2026-09-17 (including recent platform dependency updates and AWE callback fixes).
 Where something is *not* in the repo and only exists on a cluster or in Jenkins,
 it is called out explicitly, because those are the parts that bite on a rebuild.
 
@@ -28,7 +28,8 @@ Helm chart + base images from GitLab) plus a thin farmer layer on top:
 | staff-portal-ui (1.2.1 base + farmer bundle patches) | root `Dockerfile`, target `staff-ui` | same release |
 | farmer domain package (`farmer-extension/`), seed metadata, AWE policy, DCI templates | this repo, baked into the images | same release |
 | sanity e2e suite | `docker/sanity-tests/Dockerfile` | same release, post-upgrade hook Job |
-| analytics layer (reporting views, Superset dashboards, Insights maps content) | `helm/openg2p-farmer-registry/templates/` | same release, **disabled by CI** |
+| analytics layer (reporting views, Superset dashboards, Insights maps content) | `helm/openg2p-farmer-registry/templates/` | same release; CI enables **only the reporting views** |
+| dashboard-api (chart data for the OAN dashboards) | [farmer-registry-dashboard-api](https://github.com/Centre-for-Open-Societal-Systems/farmer-registry-dashboard-api), cloned by CI; `templates/dashboard-api.yaml` | same release, ClusterIP only (§3.5) |
 | IAM, Keycloak, AWE, Master Data, Partner Mgmt, Consent Mgr, audit manager, keymanager, (Superset off) | `openg2p-commons-services` chart | Helm release **`commons-services`** |
 | PostgreSQL (`commons-postgresql-0`), Redis (`commons-redis`), MinIO (`commons-minio`) | `openg2p-commons` base chart | Helm release **`commons`** |
 
@@ -98,6 +99,7 @@ the older `docker/<service>/Dockerfile` copies — those drifted (staff-ui still
 | `staff-ui` | `--target staff-ui` | `openg2p/openg2p-registry-staff-ui:${STAFF_UI_VERSION}` (Docker Hub, **1.2.1**) | `DASHBOARD_URL=` (empty: no Dashboard button) |
 | `sanity-tests` | `docker/sanity-tests/Dockerfile` | platform sanity image | `RP_VERSION` |
 | `dashboard-ui` | `docker/dashboard-ui/Dockerfile` | — | **skipped in CI**: needs the untracked `dashboard-ui/lib/`; the chart does not deploy it |
+| `dashboard-api` | `.build/dashboard-api/Dockerfile`, context `.build/dashboard-api` (the dashboard-api repo, §3.5) | `python:3.11-slim` | — |
 
 `RP_VERSION` is **`0.0.0-develop.384`** and is pinned in three places that must
 agree: `Dockerfile` (`ARG RP_VERSION`), `Jenkinsfile` (`RP_VERSION` env), and
@@ -145,8 +147,9 @@ Multibranch pipeline. Every branch builds and pushes; only `develop` and
 | Stage | Agent | What it does |
 | --- | --- | --- |
 | Checkout | any | `checkout scm` |
+| Checkout dashboard-api | any | clones the dashboard-api repo (same-named branch, else `develop`; `DASHBOARD_API_REF` pins) into `.build/dashboard-api` |
 | ECR Login | any | `aws-ecr-creds` → `docker login` |
-| Build & Push | any | builds the 6 images above, pushes `<sha12>` and `develop` tags |
+| Build & Push | any | builds the 7 images above, pushes `<sha12>` and `develop` tags |
 | Stash chart | any | stashes `helm/openg2p-farmer-registry/**` only |
 | Deploy (far namespace) | **`vpn-agent2`** | `when { branch develop \|\| staging }`, `beforeAgent true` so other branches never queue for the VPN node |
 | post/always | — | `docker image prune -f`, `docker logout` |
@@ -159,7 +162,8 @@ Multibranch pipeline. Every branch builds and pushes; only `develop` and
 2. Writes `/tmp/values-far-cicd-<build>.yaml` — the **only** values CI owns:
    - `registry.{staffApi,staffUi,partnerApi,celeryWorker,celeryBeat,dbSeed,sanity}.image.{repository,tag}` → ECR + `<sha12>`
    - `registry.dbSeed.loadAttributes: false`
-   - `analytics.{bulkSample,reportingViews,dashboards}.enabled: false`, `mapsContent.enabled: false` — registry only, no analytics layer on these clusters
+   - `dashboardApi.enabled: true`, `dashboardApi.image.{repository,tag}` → ECR + `<sha12>`
+   - `analytics.reportingViews.enabled: true` (the dashboard API reads `fr_rpt_*`); `analytics.{bulkSample,dashboards}.enabled: false`, `mapsContent.enabled: false`
 3. `helm get values farmer-registry -n far -o yaml` → `/tmp/far-values-current-<build>.yaml`.
    **This is what preserves the environment**: hostnames, Keycloak/IAM wiring,
    cookie domain, CA-bundle mount all live in the release's values, not in git.
@@ -175,9 +179,14 @@ Multibranch pipeline. Every branch builds and pushes; only `develop` and
    -f <live> -f <ci> --timeout 20m`. On failure prints the captured hook logs
    and exits 1.
 7. `kubectl rollout status` (180 s each) for `staff-portal-api`,
-   `staff-portal-ui`, `partner-api`, `celery-worker`, `celery-beat-producer`.
-8. Prints `succeeded/failed` counts of the `farmer-registry-db-seed` and
-   `farmer-registry-sanity` Jobs.
+   `staff-portal-ui`, `partner-api`, `celery-worker`, `celery-beat-producer`,
+   `dashboard-api`.
+8. Prints `succeeded/failed` counts of the `farmer-registry-db-seed`,
+   `farmer-registry-sanity` and `farmer-registry-fr-reporting-views` Jobs.
+9. Smoke-tests the dashboard API through its Service: `/health` and four charts
+   (`farmerKpis`, `farmersByRegion`, `landTenureSplit`, `registryTrendByMonth`)
+   must answer 200. Readiness alone only proves the database answers `SELECT 1`;
+   this catches missing reporting views before the dashboards do.
 
 Values precedence (later wins): chart defaults (subchart) → wrapper chart
 `values.yaml` → live release values → CI values. So a key set in the wrapper
@@ -194,11 +203,12 @@ created, so the last run's Job stays visible until the next deploy):
 | Weight | Job | Notes |
 | --- | --- | --- |
 | pre-install/upgrade | `awe-callback-hmac-secret` | generates `farmer-registry-awe-callback-hmac` (key `hmac-secret`) if absent |
-| 10 | `farmer-registry-db-seed` | registry schema/meta_data, AWE policy + `callback_secret` (and, from PR #33, repoints open AWE requests), sample data/images/templates per `registry.dbSeed.load*` |
+| 10 | `farmer-registry-db-seed` | registry schema/meta_data, AWE policy + `callback_secret` (repointing open AWE requests to cluster-internal callback URLs), sample data/images/templates per `registry.dbSeed.load*` |
 | 11 / 12 / 13 | sanity `pm-seed`, `cm-seed`, `data-seed` | seed a persistent sanity partner into PM/CM and a sanity farmer |
 | 19 / 20 | `iam-register` configmap + Job | registers the "Farmer Registry" tile, roles and permissions in IAM |
 | 25 | `farmer-registry-sanity` | farmer e2e suite (`registry.sanity.*`), `runE2e`/`failOnError` at subchart defaults |
-| 15 / 20 / 30 | analytics jobs | **disabled** by the CI overlay |
+| 40 / 50 | analytics bulk sample, dashboard import | **disabled** by the CI overlay |
+| 45 | `farmer-registry-fr-reporting-views` | creates the `fr_rpt_*` views the dashboard API reads; refreshed hourly by CronJob `farmer-registry-fr-reporting-views-refresh` |
 
 Consequences: a deploy is never a no-op — db-seed, sanity seeds and
 iam-register all re-run. The seed SQL is written to be idempotent for that
@@ -271,6 +281,60 @@ line: there is no `http {}`-level value, so the other
 `*-development.oanstaging.com` portals on the host (crop, livestock, ...)
 are still on the 1 MB default and need the same line if they upload files.
 
+### 3.5 Dashboard API (`farmer-registry-dashboard-api`)
+
+A read-only FastAPI service that serves chart data to the OAN dashboards BFF
+from the `fr_rpt_farmer` / `fr_rpt_land` reporting views. Its source is its own
+public repository,
+[Centre-for-Open-Societal-Systems/farmer-registry-dashboard-api](https://github.com/Centre-for-Open-Societal-Systems/farmer-registry-dashboard-api);
+this pipeline builds and deploys it with the registry.
+
+- **Source branch.** The *Checkout dashboard-api* stage clones the branch of
+  the same name: `develop` builds `develop`, `staging` builds `staging`; any
+  other branch (or PR) uses a same-named branch if one exists, else `develop`.
+  Set `DASHBOARD_API_REF` (branch or tag) on the job to pin one. The log prints
+  `dashboard-api: <ref> @ <sha12>`, and the image carries it as OCI labels.
+  That branch must already contain the service, or the stage stops with
+  `dashboard-api <ref> has no Dockerfile`.
+- **Not triggered by the service repo.** A push there deploys with the next
+  farmer-registry build of the matching branch; re-run that job to ship it
+  sooner.
+- **Image.** `openg2p/farmer-registry/dashboard-api`, tagged `<sha12>` and
+  `develop` like the others. The ECR repository has to exist (§7 step 6).
+- **Deployment.** `templates/dashboard-api.yaml`, values `dashboardApi.*` (off
+  by default; the CI overlay enables it). Deployment + ClusterIP Service
+  `farmer-registry-dashboard-api`, port 80 → 8000, readiness on `/health`.
+  The BFF runs in the cluster and uses
+  `FARMER_REGISTRY_DASHBOARD_API_URL=http://farmer-registry-dashboard-api.far`.
+- **Private hostname.** The CI overlay also routes
+  `https://dashboard-api.far.openg2p.test` through the `far/internal` Istio
+  gateway (`dashboardApi.virtualService`), for developers and tools on the VPC,
+  WireGuard or allowlisted IPs, exactly like the other `*.far.openg2p.test`
+  apps: host nginx :443 with the `openg2p-private` allowlist, then Istio. No new
+  port and no security-group change. Never attach it to `public-oanstaging`:
+  the service has no authentication.
+- **Database.** Registry user and Secret (`farmer-registry` /
+  `farmer-registry-db-user`), the same as the analytics jobs. The password is
+  passed as `PGPASSWORD`, never inside `DATABASE_URL`. Each gunicorn worker
+  (`dashboardApi.workers`, default 2) holds a pool of `dashboardApi.dbPool`
+  connections (1 open, up to 5), so a replica uses at most 10.
+- **Reporting views.** The CI overlay enables `analytics.reportingViews`, so the
+  views are (re)created by hook Job `farmer-registry-fr-reporting-views` on every
+  deploy and refreshed hourly. A failure there fails the Helm upgrade; its logs
+  are printed by the deploy stage.
+- **Tunables** kept in the live release values: `dashboardApi.geoLevelTotals`
+  (national unit counts for coverage rates), `allowedOrigins`, `replicas`,
+  `workers`, `env`, `resources`.
+
+**Order of merges.** The *Checkout dashboard-api* stage clones the service's
+`develop` (or same-named) branch, so the service must be merged there before the
+first registry build that enables it, or that build stops at checkout.
+
+Quick check: `curl https://dashboard-api.far.openg2p.test/health` (over WireGuard,
+or from the box with `--resolve dashboard-api.far.openg2p.test:443:127.0.0.1 -k`),
+or `kubectl -n far port-forward svc/farmer-registry-dashboard-api 8005:80`, then
+`curl localhost:8005/health` and `localhost:8005/api/v1/charts/farmerKpis`.
+
 ---
 
 ## 4. Deploy: the shared platform (`ci/commons-services/`)
@@ -292,7 +356,7 @@ pipeline.
 | `values-far.yaml` | overlay applied on top of the live values: master-data image path moved to `platform-services/`, geo-seed image path, `objectStore.endpoint: ""`, `masterDataUi/superset/inji-certify` disabled |
 | `master-data-schema-topup.sql` | idempotent `ADD COLUMN IF NOT EXISTS` set for master-data, run in the pod before the upgrade |
 | `apply-sql-in-pod.py` | runs SQL from stdin inside the master-data-api pod with its own DB env (old or new prefix) |
-| `README.md` | rationale, how to regenerate the top-up SQL, why rc.217 |
+| `../docs/commons-services-upgrade.md` | rationale, how to regenerate the top-up SQL, why rc.217 |
 
 ### 4.2 Job setup (one-time, in Jenkins)
 
@@ -302,7 +366,7 @@ Run with *Build with Parameters*; with `CONFIRM` unticked it checks out and
 stops. The pre-upgrade live values are archived with the build as
 `commons-services-values-rev<N>.yaml`.
 
-Check the job exists before relying on it — PR #30 only merged on 2026-09-16.
+Check the job exists before relying on it — this functionality was introduced in mid-September 2026.
 
 ### 4.3 What `upgrade.sh` does
 
@@ -341,7 +405,7 @@ is settled: a fresh namespace or rebuild must recreate this ConfigMap by hand
 `*.openg2p.test` host. `SSL_CERT_FILE` *replaces* Python's default trust store,
 so the bundle must keep the public roots (it does).
 
-PR #33 removes the registry's own dependence on this for the AWE callback by
+Recent updates remove the registry's own dependence on this for the AWE callback by
 calling `staff-portal-api` in-cluster over http.
 
 ---
@@ -365,7 +429,7 @@ header comment: extract `ca.crt` and `token` from `farmer-ci-token`,
 `kubectl config set-cluster/set-credentials/set-context`, verify with
 `kubectl auth can-i list secrets -n far`) and upload it to Jenkins as a
 **Secret file** credential with ID `gen2-dev-kubeconfig` (dev) or
-`staging-farmer-kubeconfig` (staging). PR #27 switched the dev credential id to
+`staging-farmer-kubeconfig` (staging). The dev credential ID was recently switched to
 `gen2-dev-kubeconfig`; check `origin/develop` before copying ids.
 
 ---
@@ -391,7 +455,7 @@ against it and the staff-ui CSP is derived from it), the `far-ca-bundle` volume
 contradicts the PR-only rule. There is no tracked per-environment values file
 yet. Until there is, the least-bad path: put the change in
 `helm/openg2p-farmer-registry/values.yaml` if it is environment-independent
-(as PR #33 does), or raise it with Suresh if it is not. **Back up
+(as recent updates do), or raise it with Suresh if it is not. **Back up
 `helm get values` before any manual change.**
 
 ---
@@ -414,7 +478,20 @@ Ordered. Items marked *(manual)* are not scripted anywhere in this repo.
    (cluster-wide, `ca.crt`, used by UI deployments via `NODE_EXTRA_CA_CERTS`).
 5. Apply `ci/k8s/farmer-deploy-rbac.yaml`; build the kubeconfig; add the
    Jenkins Secret-file credential (§5).
-6. Jenkins: multibranch pipeline on the repo; credentials `aws-ecr-creds`,
+5b. *(manual, only when commons-services is in a **different** namespace from
+   the registry)* Apply `ci/k8s/commons-aliases.yaml` — ExternalName aliases for
+   the nine `commons-services-*` hosts the chart addresses by bare short name.
+   Without them those names are NXDOMAIN and the failures are silent: a missing
+   master-data alias renders the intake form's Location dropdowns as an absent
+   block, and a missing pm-partner-api alias breaks partner signature
+   validation. Edit both namespaces in the file first. Skip it entirely where
+   commons-services shares the registry's namespace (the dev cluster) — the
+   bare names are correct there.
+6. *(manual, once per AWS account)* ECR repository
+   `openg2p/farmer-registry/dashboard-api` (ap-south-1, mutable tags); the IAM
+   user behind `aws-ecr-creds` must be able to push to it and the cluster nodes
+   to pull from it (§3.5).
+   Jenkins: multibranch pipeline on the repo; credentials `aws-ecr-creds`,
    env `AWS_ACCOUNT_ID`; node `vpn-agent2` with `helm`, `kubectl`, VPN.
    Standalone `ci/commons-services` job (§4.2).
 7. First registry deploy: push to `develop` (dev) / `staging`. With no release
@@ -451,7 +528,18 @@ kubectl -n $NS logs job/$R-db-seed --tail=50
 # Master data routes as the UI sees them
 kubectl -n $NS exec deploy/$R-staff-portal-ui -- sh -c 'wget -qO- "$MASTERDATA_BACKEND_API_URL/openapi.json"' | grep -o '"/geo/[a-z_]*"' | sort -u
 
-# AWE wiring (after PR #33)
+# Every commons-services host the chart names resolves from a consuming pod.
+# Bare short names resolve in the pod's OWN namespace, so where commons-services
+# is elsewhere each needs an ExternalName alias (§7 step 5b). Empty output for
+# any line is the fault — and it fails silently, so check it rather than waiting
+# for a widget to go blank.
+for h in iam-staff-portal-api master-data-api pm-partner-api pm-staff-portal-api \
+         cm-partner-api cm-api keymanager auditmanager; do
+  printf '%-24s ' "$h"
+  kubectl -n $NS exec deploy/$R-partner-api -- getent hosts "commons-services-$h" || echo "UNRESOLVED"
+done
+
+# AWE wiring (updated internal callback)
 kubectl -n $NS exec -i commons-postgresql-0 -- sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -U postgres -d awe -X -c "SELECT id, caller_service FROM callback_secret;"'
 kubectl -n $NS exec -i commons-postgresql-0 -- sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -U postgres -d awe -X -c "SELECT status, count(*) FROM webhook_delivery GROUP BY 1;"'
 
@@ -493,9 +581,10 @@ schema top-up is additive and needs no undo.
 | Symptom | Cause / where to look |
 | --- | --- |
 | `helm list` shows a release `failed` | last upgrade's hook Job failed or timed out. `helm history`, then the hook logs printed in the Jenkins build. `helm upgrade` still runs on a `failed` release (only `pending-*` blocks it), but understand the failure first. `farmer-registry` was `failed` at rev 15 (2026-09-15) when last checked. |
-| `ImagePullBackOff` on `commons-services-*` | image path moved to `registry.gitlab.com/openg2p/platform-services/...`; the old `openg2p/master-data-service/...` path denies anonymous pulls. `values-far.yaml` overrides master-data and geo-seed; PR #32 adds partner-management. `cm-api-expire-*` and `kc-sa-role-*` were in this state on 2026-09-17. |
-| Location dropdowns 404 (`get_all_g2p_geo_levels`) | master-data serving old route names — the reason `ci/commons-services` exists. Verify on the pod, not on a local image of the same tag. |
-| Approval stuck in `PENDING`, AWE shows `approved` | webhook not delivered. `SELECT status, left(last_error,80), count(*) FROM webhook_delivery GROUP BY 1,2` in the `awe` DB. Before PR #33: `CERTIFICATE_VERIFY_FAILED` to the ingress host. |
+| `ImagePullBackOff` on `commons-services-*` | image path moved to `registry.gitlab.com/openg2p/platform-services/...`; the old `openg2p/master-data-service/...` path denies anonymous pulls. `values-far.yaml` overrides master-data and geo-seed; partner-management is also overridden to use the updated path. `cm-api-expire-*` and `kc-sa-role-*` were in this state on 2026-09-17. |
+| A widget renders nothing at all — no error, no empty control (Location dropdowns are the known case) | **Check DNS from the consuming pod before suspecting the service's version.** The chart addresses the shared services by bare short name, which resolves in the consuming pod's own namespace; where commons-services is in a different namespace an ExternalName alias must exist (`ci/k8s/commons-aliases.yaml`). `kubectl -n $NS exec deploy/$R-partner-api -- getent hosts commons-services-master-data-api` — empty output is the fault. Four were missing on staging (2026-09-22) and this was misread as the route-rename issue below. |
+| Location dropdowns 404 (`get_all_g2p_geo_levels`) | master-data serving old route names — the reason `ci/commons-services` exists. Verify **the routes actually served** on the pod, not on a local image of the same tag: `kubectl -n $NS exec deploy/$R-staff-portal-ui -- sh -c 'wget -qO- "$MASTERDATA_BACKEND_API_URL/openapi.json"' \| grep -o '"/geo/[a-z_]*"'`. If that lists `get_all_geo_levels`, the build is current and the cause is the DNS row above. |
+| Approval stuck in `PENDING`, AWE shows `approved` | webhook not delivered. `SELECT status, left(last_error,80), count(*) FROM webhook_delivery GROUP BY 1,2` in the `awe` DB. (Historically caused by \`CERTIFICATE_VERIFY_FAILED\` prior to internal callback routing). |
 | Submission `APPROVED` but no farmer created | `register_ingest_process_status` — if `NOT_APPLICABLE` the approval was set by hand without the ingest flag; if `FAILED` read `register_ingest_process_last_error_code` and the celery-worker log. |
 | Farmer photo missing, no error | `global.minioHost` points at an in-cluster name; must be browser-resolvable and identical to the signer's host (`test/staff-ui/test_minio_presigned_host.py`). |
 | Staff-ui build fails `PATCH NOT APPLIED` | a bundle sed no longer matches the base 1.2.x build; re-anchor the patch in the root `Dockerfile`. |
@@ -527,7 +616,7 @@ pass `-p`: `docker-compose.yml` names the project `farmer-registry` and a bare
 `up` on a machine with an older project attaches to the wrong volumes. See
 `local/README.md`. Local uses the in-cluster-style AWE callback
 `http://farmer-registry-staff-api:8000/awe/webhooks/decision`, which is what
-PR #33 aligns the cluster with.
+matches the cluster's behavior.
 
 ---
 
