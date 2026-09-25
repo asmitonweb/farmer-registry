@@ -28,7 +28,8 @@ Helm chart + base images from GitLab) plus a thin farmer layer on top:
 | staff-portal-ui (1.2.1 base + farmer bundle patches) | root `Dockerfile`, target `staff-ui` | same release |
 | farmer domain package (`farmer-extension/`), seed metadata, AWE policy, DCI templates | this repo, baked into the images | same release |
 | sanity e2e suite | `docker/sanity-tests/Dockerfile` | same release, post-upgrade hook Job |
-| analytics layer (reporting views, Superset dashboards, Insights maps content) | `helm/openg2p-farmer-registry/templates/` | same release, **disabled by CI** |
+| analytics layer (reporting views, Superset dashboards, Insights maps content) | `helm/openg2p-farmer-registry/templates/` | same release; CI enables **only the reporting views** |
+| dashboard-api (chart data for the OAN dashboards) | [farmer-registry-dashboard-api](https://github.com/Centre-for-Open-Societal-Systems/farmer-registry-dashboard-api), cloned by CI; `templates/dashboard-api.yaml` | same release, ClusterIP only — see [dashboard-api-deployment.md](dashboard-api-deployment.md) |
 | IAM, Keycloak, AWE, Master Data, Partner Mgmt, Consent Mgr, audit manager, keymanager, (Superset off) | `openg2p-commons-services` chart | Helm release **`commons-services`** |
 | PostgreSQL (`commons-postgresql-0`), Redis (`commons-redis`), MinIO (`commons-minio`) | `openg2p-commons` base chart | Helm release **`commons`** |
 
@@ -98,6 +99,7 @@ the older `docker/<service>/Dockerfile` copies — those drifted (staff-ui still
 | `staff-ui` | `--target staff-ui` | `openg2p/openg2p-registry-staff-ui:${STAFF_UI_VERSION}` (Docker Hub, **1.2.1**) | `DASHBOARD_URL=` (empty: no Dashboard button) |
 | `sanity-tests` | `docker/sanity-tests/Dockerfile` | platform sanity image | `RP_VERSION` |
 | `dashboard-ui` | `docker/dashboard-ui/Dockerfile` | — | **skipped in CI**: needs the untracked `dashboard-ui/lib/`; the chart does not deploy it |
+| `dashboard-api` | `.build/dashboard-api/Dockerfile`, context `.build/dashboard-api` (the dashboard-api repo, same-named branch, else `develop`) | `python:3.11-slim` | — ([dashboard-api-deployment.md](dashboard-api-deployment.md)) |
 
 `RP_VERSION` is **`0.0.0-develop.384`** and is pinned in three places that must
 agree: `Dockerfile` (`ARG RP_VERSION`), `Jenkinsfile` (`RP_VERSION` env), and
@@ -145,8 +147,9 @@ Multibranch pipeline. Every branch builds and pushes; only `develop` and
 | Stage | Agent | What it does |
 | --- | --- | --- |
 | Checkout | any | `checkout scm` |
+| Checkout dashboard-api | any | clones the dashboard-api repo (same-named branch, else `develop`; `DASHBOARD_API_REF` pins) into `.build/dashboard-api` |
 | ECR Login | any | `aws-ecr-creds` → `docker login` |
-| Build & Push | any | builds the 6 images above, pushes `<sha12>` and `develop` tags |
+| Build & Push | any | builds the 7 images above, pushes `<sha12>` and `develop` tags |
 | Stash chart | any | stashes `helm/openg2p-farmer-registry/**` only |
 | Deploy (far namespace) | **`vpn-agent2`** | `when { branch develop \|\| staging }`, `beforeAgent true` so other branches never queue for the VPN node |
 | post/always | — | `docker image prune -f`, `docker logout` |
@@ -159,7 +162,8 @@ Multibranch pipeline. Every branch builds and pushes; only `develop` and
 2. Writes `/tmp/values-far-cicd-<build>.yaml` — the **only** values CI owns:
    - `registry.{staffApi,staffUi,partnerApi,celeryWorker,celeryBeat,dbSeed,sanity}.image.{repository,tag}` → ECR + `<sha12>`
    - `registry.dbSeed.loadAttributes: false`
-   - `analytics.{bulkSample,reportingViews,dashboards}.enabled: false`, `mapsContent.enabled: false` — registry only, no analytics layer on these clusters
+   - `dashboardApi.enabled: true`, `dashboardApi.image.{repository,tag}` → ECR + `<sha12>`
+   - `analytics.reportingViews.enabled: true` (the dashboard API reads `fr_rpt_*`); `analytics.{bulkSample,dashboards}.enabled: false`, `mapsContent.enabled: false`
 3. `helm get values farmer-registry -n far -o yaml` → `/tmp/far-values-current-<build>.yaml`.
    **This is what preserves the environment**: hostnames, Keycloak/IAM wiring,
    cookie domain, CA-bundle mount all live in the release's values, not in git.
@@ -175,9 +179,10 @@ Multibranch pipeline. Every branch builds and pushes; only `develop` and
    -f <live> -f <ci> --timeout 20m`. On failure prints the captured hook logs
    and exits 1.
 7. `kubectl rollout status` (180 s each) for `staff-portal-api`,
-   `staff-portal-ui`, `partner-api`, `celery-worker`, `celery-beat-producer`.
-8. Prints `succeeded/failed` counts of the `farmer-registry-db-seed` and
-   `farmer-registry-sanity` Jobs.
+   `staff-portal-ui`, `partner-api`, `celery-worker`, `celery-beat-producer`,
+   `dashboard-api`.
+8. Prints `succeeded/failed` counts of the `farmer-registry-db-seed`,
+   `farmer-registry-sanity` and `farmer-registry-fr-reporting-views` Jobs.
 
 Values precedence (later wins): chart defaults (subchart) → wrapper chart
 `values.yaml` → live release values → CI values. So a key set in the wrapper
@@ -198,7 +203,8 @@ created, so the last run's Job stays visible until the next deploy):
 | 11 / 12 / 13 | sanity `pm-seed`, `cm-seed`, `data-seed` | seed a persistent sanity partner into PM/CM and a sanity farmer |
 | 19 / 20 | `iam-register` configmap + Job | registers the "Farmer Registry" tile, roles and permissions in IAM |
 | 25 | `farmer-registry-sanity` | farmer e2e suite (`registry.sanity.*`), `runE2e`/`failOnError` at subchart defaults |
-| 15 / 20 / 30 | analytics jobs | **disabled** by the CI overlay |
+| 40 / 50 | analytics bulk sample, dashboard import | **disabled** by the CI overlay |
+| 45 | `farmer-registry-fr-reporting-views` | creates the `fr_rpt_*` views the dashboard API reads; refreshed hourly by CronJob `farmer-registry-fr-reporting-views-refresh` |
 
 Consequences: a deploy is never a no-op — db-seed, sanity seeds and
 iam-register all re-run. The seed SQL is written to be idempotent for that
@@ -414,7 +420,10 @@ Ordered. Items marked *(manual)* are not scripted anywhere in this repo.
    (cluster-wide, `ca.crt`, used by UI deployments via `NODE_EXTRA_CA_CERTS`).
 5. Apply `ci/k8s/farmer-deploy-rbac.yaml`; build the kubeconfig; add the
    Jenkins Secret-file credential (§5).
-6. Jenkins: multibranch pipeline on the repo; credentials `aws-ecr-creds`,
+6. *(manual, once per AWS account)* ECR repository
+   `openg2p/farmer-registry/dashboard-api` (`ci/aws/create-dashboard-api-ecr.sh`,
+   see [dashboard-api-deployment.md](dashboard-api-deployment.md) §2–4).
+   Jenkins: multibranch pipeline on the repo; credentials `aws-ecr-creds`,
    env `AWS_ACCOUNT_ID`; node `vpn-agent2` with `helm`, `kubectl`, VPN.
    Standalone `ci/commons-services` job (§4.2).
 7. First registry deploy: push to `develop` (dev) / `staging`. With no release
