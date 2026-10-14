@@ -1,8 +1,9 @@
 # OpenG2P deployment checklist (G2R-311)
 
+## Decided
+- **No COSS Helm repo.** Each registry's chart is stored in its own repo (`helm/` in farmer, livestock and crop). Jenkins deploys from the checked-out chart. No chart publishing, gh-pages, OCI push or Rancher catalog.
+
 ## Decide first
-- [ ] **Chart:** shared farmer chart for livestock/crop (Gen2 doc) or a thin chart per repo (Jira)?
-- [ ] **Helm repo:** CI pushes charts (Gen2 doc) or no COSS Helm repo (Jira)?
 - [ ] **Base images:** GitLab (Gen2 doc) or OpenG2P Docker Hub (Jira / repo)?
 - [ ] **Namespace name:** `common` (Gen2 doc) or `commons` (Jira / scripts)?
 - [ ] **Commons Secrets:** who re-syncs the copies in `far`/`live`/`crop` when a commons password changes?
@@ -21,6 +22,8 @@
 - [ ] Commons-services names resolve from registry pods (apply `commons-aliases.yaml`).
 
 ## Registry services (far / live / crop)
+- [ ] Each registry deploys from its own repo's chart: `helm dependency build` + `helm lint` / `template`, then `helm upgrade --install <release> ./helm/<chart>`.
+- [ ] Livestock and crop each have their own chart directory, not a copy of the farmer chart.
 - [ ] Images: Jenkins → ECR → tag in Helm values (git) → `helm upgrade`. Dev uses the `develop` tag; staging/UAT use a pinned release.
 - [ ] All environment variables come from Helm. Nothing is edited by hand in Rancher. Check `COOKIE_DOMAIN`, the https IAM URL and the app mnemonic.
 - [ ] Pods are Running: staff-api, staff-ui, partner-api, celery worker/beat, dashboard-api.
