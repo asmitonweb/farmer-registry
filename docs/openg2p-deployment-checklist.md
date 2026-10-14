@@ -2,16 +2,20 @@
 
 ## Decided
 - **No COSS Helm repo.** Each registry's chart is stored in its own repo (`helm/` in farmer, livestock and crop). Jenkins deploys from the checked-out chart. No chart publishing, gh-pages, OCI push or Rancher catalog.
+- **OpenG2P is GitHub-only. No GitLab anywhere.** Code is on github.com/OpenG2P, images are on Docker Hub `openg2p/*`, charts come from `openg2p.github.io/openg2p-helm`, and versions come from [OpenG2P/versions](https://github.com/OpenG2P/versions).
 - **Namespaces follow the OpenG2P standard.** Below, `<commons-ns>` is the shared-services namespace and `<registry-ns>` is each registry's namespace. Fill in the real names from the OpenG2P deployment docs.
 
 ## Decide first
-- [ ] **Base images:** GitLab (Gen2 doc) or OpenG2P Docker Hub (Jira / repo)?
+- [ ] **Registry-platform pin:** stay on 1.2.2-rc.544, or move to the newer **1.2.2-rc.554** listed in OpenG2P/versions?
 - [ ] **Commons Secrets:** who re-syncs the copies in each `<registry-ns>` when a commons password changes?
 
 ## Repo fixes before go-live
-- [ ] Jenkinsfile and `ci/commons-services/upgrade.sh` still use the GitLab Helm repo. Switch to `openg2p.github.io/openg2p-helm`.
+- [ ] **Remove every GitLab reference.** `grep -rni gitlab .` must come back empty in all three registry repos:
+  - Jenkinsfile and `ci/commons-services/upgrade.sh` use the GitLab Helm repo. Switch to `openg2p.github.io/openg2p-helm`.
+  - Image paths in `values.yaml` and `ci/commons-services/values-far.yaml` use `registry.gitlab.com`. Point our images at ECR and OpenG2P images at Docker Hub `openg2p/*`.
+  - `.gitlab-ci.yml`: delete it.
+  - README, `local/README.md` and the docs: update them.
 - [ ] Commons-services is pinned at 2.3.0-rc.217. Move to **2.3.4-rc.245**.
-- [ ] Image paths in `values.yaml` and `values-far.yaml` point at GitLab. Point them at ECR / OpenG2P. Delete `.gitlab-ci.yml`.
 - [ ] Remove the leftover chart-publishing pieces from `Chart.yaml`: the Rancher catalog annotations and the "CI publishes the version" comment.
 - [ ] Our scripts and values hard-code `far` and `commons` (Jenkinsfiles, `ci/commons-services/*`, `ci/connector/values-*.yaml`, `commons-aliases.yaml`, `farmer-deploy-rbac.yaml`). Parameterise them, or rename them to the OpenG2P standard names.
 - [ ] Commit the per-environment values and the CA bundle ConfigMap to git. Today they exist only on the cluster.
