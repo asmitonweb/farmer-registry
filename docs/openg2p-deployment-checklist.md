@@ -2,27 +2,28 @@
 
 ## Decided
 - **No COSS Helm repo.** Each registry's chart is stored in its own repo (`helm/` in farmer, livestock and crop). Jenkins deploys from the checked-out chart. No chart publishing, gh-pages, OCI push or Rancher catalog.
+- **Namespaces follow the OpenG2P standard.** Below, `<commons-ns>` is the shared-services namespace and `<registry-ns>` is each registry's namespace. Fill in the real names from the OpenG2P deployment docs.
 
 ## Decide first
 - [ ] **Base images:** GitLab (Gen2 doc) or OpenG2P Docker Hub (Jira / repo)?
-- [ ] **Namespace name:** `common` (Gen2 doc) or `commons` (Jira / scripts)?
-- [ ] **Commons Secrets:** who re-syncs the copies in `far`/`live`/`crop` when a commons password changes?
+- [ ] **Commons Secrets:** who re-syncs the copies in each `<registry-ns>` when a commons password changes?
 
 ## Repo fixes before go-live
 - [ ] Jenkinsfile and `ci/commons-services/upgrade.sh` still use the GitLab Helm repo. Switch to `openg2p.github.io/openg2p-helm`.
 - [ ] Commons-services is pinned at 2.3.0-rc.217. Move to **2.3.4-rc.245**.
 - [ ] Image paths in `values.yaml` and `values-far.yaml` point at GitLab. Point them at ECR / OpenG2P. Delete `.gitlab-ci.yml`.
 - [ ] Remove the leftover chart-publishing pieces from `Chart.yaml`: the Rancher catalog annotations and the "CI publishes the version" comment.
-- [ ] Commit the per-environment values and `far-ca-bundle` to git. Today they exist only on the cluster.
+- [ ] Our scripts and values hard-code `far` and `commons` (Jenkinsfiles, `ci/commons-services/*`, `ci/connector/values-*.yaml`, `commons-aliases.yaml`, `farmer-deploy-rbac.yaml`). Parameterise them, or rename them to the OpenG2P standard names.
+- [ ] Commit the per-environment values and the CA bundle ConfigMap to git. Today they exist only on the cluster.
 
 ## Platform
 - [ ] Versions come from OpenG2P/versions: registry **1.2.2-rc.544**, commons **2.3.4-rc.245**. Releases only, never `develop`.
-- [ ] Namespaces `commons`, `far`, `live` and `crop` exist. Node usage is under 80%.
-- [ ] Keycloak, Postgres, MinIO, Master Data and AWE run **only** in `commons`.
-- [ ] The 5 commons Secrets are cloned into each registry namespace: `commons-postgresql`, `commons-keycloak`, `master-data`, `commons-minio`, `awe-db-user`.
-- [ ] Commons-services names resolve from registry pods (apply `commons-aliases.yaml`).
+- [ ] Namespaces match the OpenG2P standard names: one `<commons-ns>` plus one `<registry-ns>` per registry. Node usage is under 80%.
+- [ ] Keycloak, Postgres, MinIO, Master Data and AWE run **only** in `<commons-ns>`.
+- [ ] The 5 commons Secrets are cloned into each `<registry-ns>`: `commons-postgresql`, `commons-keycloak`, `master-data`, `commons-minio`, `awe-db-user`.
+- [ ] Commons-services names resolve from registry pods (apply `commons-aliases.yaml`, edited for the standard namespace names).
 
-## Registry services (far / live / crop)
+## Registry services (each `<registry-ns>`)
 - [ ] Each registry deploys from its own repo's chart: `helm dependency build` + `helm lint` / `template`, then `helm upgrade --install <release> ./helm/<chart>`.
 - [ ] Livestock and crop each have their own chart directory, not a copy of the farmer chart.
 - [ ] Images: Jenkins → ECR → tag in Helm values (git) → `helm upgrade`. Dev uses the `develop` tag; staging/UAT use a pinned release.
@@ -34,7 +35,7 @@
   - iam-register (tile shows in IAM)
   - sanity, with e2e on
   - reporting views
-- [ ] **Geo:** seed-locations and migrate-far-geo run (dry-run first). Location dropdowns cascade in the intake form.
+- [ ] **Geo:** seed-locations, plus the one-time migrate-far-geo for farmer, run (dry-run first). Location dropdowns cascade in the intake form.
 - [ ] Re-running a single Job (`helm get hooks` → `kubectl apply`) has been tried on dev.
 
 ## ODK
@@ -46,12 +47,12 @@
 | Host | Public/Private | Resolves | TLS |
 |---|---|---|---|
 | Farmer / livestock / crop staff portals | public | | |
-| `staff-farmer-registry.far.openg2p.test` | private | | |
-| Keycloak (public + `keycloak.commons.openg2p.test`) | both | | |
-| AWE (`awe.far` → `awe.commons`?) | private | | |
+| Internal staff host (`staff-<registry>.<registry-ns>.openg2p.test`) | private | | |
+| Keycloak (public + `keycloak.<commons-ns>.openg2p.test`) | both | | |
+| AWE (`awe.<commons-ns>.openg2p.test`) | private | | |
 | MinIO (browser-resolvable) | public | | |
 | ODK Central (`odk-central*.oanstaging.com`) | public | | |
-| Connector UIs, dashboard-api (`*.far.openg2p.test`) | private | | |
+| Connector UIs, dashboard-api (`*.<registry-ns>.openg2p.test`) | private | | |
 
 - [ ] Keycloak redirect URIs and cookie domain match the final hosts. The Local CA is trusted by internal clients. nginx allows 12 MB uploads on every portal.
 
