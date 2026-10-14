@@ -12,6 +12,7 @@
 - [ ] Jenkinsfile and `ci/commons-services/upgrade.sh` still use the GitLab Helm repo. Switch to `openg2p.github.io/openg2p-helm`.
 - [ ] Commons-services is pinned at 2.3.0-rc.217. Move to **2.3.4-rc.245**.
 - [ ] Image paths in `values.yaml` and `values-far.yaml` point at GitLab. Point them at ECR / OpenG2P. Delete `.gitlab-ci.yml`.
+- [ ] Remove the leftover chart-publishing pieces from `Chart.yaml`: the Rancher catalog annotations and the "CI publishes the version" comment.
 - [ ] Commit the per-environment values and `far-ca-bundle` to git. Today they exist only on the cluster.
 
 ## Platform
