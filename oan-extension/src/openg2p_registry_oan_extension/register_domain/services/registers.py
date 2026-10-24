@@ -25,14 +25,14 @@ class FarmerPhoneService(Derivations, G2PRegisterDomainService):
         primaries, numbers = 0, set()
         for record in records:
             if is_blank(record.get("phone_number")):
-                validation_error("Phone Number is required for each phone row")
+                validation_error("Phone Number: a row has no number. Enter the number, or remove the row")
             if record.get("is_primary"):
                 primaries += 1
             if record["phone_number"] in numbers:
-                validation_error("The same Phone Number is listed more than once")
+                validation_error("Phone Number: the same number is listed twice. Keep one row for it and remove the other")
             numbers.add(record["phone_number"])
         if primaries > 1:
-            validation_error("Only one phone number can be the primary one")
+            validation_error("Primary: more than one number is marked primary. Tick Primary for one number only")
 
     async def derive(self, records: list[dict]) -> None:
         for record in records:
@@ -44,7 +44,7 @@ class FarmerPhoneService(Derivations, G2PRegisterDomainService):
                 record["country_code"] = "ET"
             national, e164 = normalize_phone(record["phone_number"], record["country_code"])
             if national is None:
-                validation_error(f"{record['phone_number']} is not a phone number, e.g. 0912345678 or +251912345678")
+                validation_error(f"Phone Number: {record['phone_number']} is not a phone number. Enter it as 0912345678 or +251912345678")
             record["phone_number"], record["phone_e164"] = national, e164
 
     async def pre_approve(self, change_request, session):

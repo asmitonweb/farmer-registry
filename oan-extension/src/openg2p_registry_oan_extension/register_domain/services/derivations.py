@@ -256,7 +256,7 @@ def _store_document(value, created_by) -> str:
     try:
         content = base64.b64decode(value.get("data") or "", validate=True)
     except ValueError:
-        validation_error("The certificate file could not be read")
+        validation_error("Land Certificate: the file could not be read. Attach the file again, or choose another copy")
     digest = hashlib.sha256(content).hexdigest()
     if digest in _uploaded:
         _uploaded.move_to_end(digest)

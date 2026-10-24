@@ -257,7 +257,7 @@ form_layout (oan_section_id, upstream_section_id, col, ord, w) AS (
   ('oan_farmer_location', 'farmer_farmer_location_section_03', 2, 2, '{"widget-id": "address_line_1"}'),
   ('oan_farmer_location', 'farmer_farmer_location_section_03', 2, 3, '{"widget-id": "address_line_2"}'),
   ('oan_farmer_location', 'farmer_farmer_location_section_03', 2, 4, '{"widget-id": "postal_code"}'),
-  ('oan_farmer_location', 'farmer_farmer_location_section_03', 2, 5, '{"widget-id": "country_code"}'),
+  ('oan_farmer_location', 'farmer_farmer_location_section_03', 2, 5, '{"widget-id": "country_code", "widget-data-default": "ET", "widget-data-validation": {"pattern": "^[A-Z]{2}$", "minLength": 2, "maxLength": 2, "patternMessage": "country_code_format"}}'),
   -- A second, local or community language.
   ('oan_farmer_location', 'farmer_farmer_location_section_03', 2, 6,
    '{"widget": "select", "widget-id": "local_language", "widget-type": "input", "widget-label": "local_language",
