@@ -5,6 +5,7 @@ import json
 import time
 
 from openg2p_fastapi_common.context import dbengine
+from openg2p_registry_core.errors import G2PRegistryErrorCodes, G2PRegistryException
 from openg2p_registry_core.services import G2PRegisterDomainService
 from openg2p_registry_farmer_extension.register_domain import services as _farmer
 from openg2p_registry_farmer_extension.register_domain.services import *
@@ -16,7 +17,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from .derivations import DERIVATIONS, Derivations
 from .registers import FarmerPhoneService
-from .widget_rules import Rules, check_record, collect_rules
+from .upstream_messages import reword
+from .widget_rules import Rules, check_record, collect_rules, normalize_record
 
 # Section metadata is seed data that can change without a restart.
 _RULES_TTL_SECONDS = 300
@@ -52,19 +54,28 @@ async def _load() -> tuple[Rules, dict[str, str], dict[str, str]]:
 
 class WidgetRuleValidation:
     """Adds the derived values and the section widgets' value rules to a
-    register's domain checks: derive first, so the farmer checks see them."""
+    register's domain checks: derive first, so the farmer checks see them.
+    A message from the farmer extension's checks is reworded to name the field
+    by its label and say what to enter (upstream_messages)."""
 
     _derive_first = False
 
     async def validate_domain_attributes(self, records: list[dict]):
+        rules, registers, messages = await _load()
         if type(self)._derive_first:
             await self.derive(records)
         if type(self)._upstream_validates:
-            await super().validate_domain_attributes(records)
-        rules, registers, messages = await _load()
+            try:
+                await super().validate_domain_attributes(records)
+            except G2PRegistryException as error:
+                if error.code != G2PRegistryErrorCodes.REQUEST_VALIDATION_ERROR.value[1] or not error.message:
+                    raise
+                validation_error(reword(error.message, messages))
         field_rules = rules.get(registers.get(self.register_mnemonic()), {})
         if not field_rules:
             return
+        for record in records:
+            normalize_record(record, field_rules)
         problems = [p for record in records for p in check_record(record, field_rules, messages)]
         if problems:
             validation_error("; ".join(dict.fromkeys(problems)))

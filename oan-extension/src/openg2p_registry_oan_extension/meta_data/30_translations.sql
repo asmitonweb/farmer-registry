@@ -1,5 +1,8 @@
--- Labels for the OAN widgets and panels, merged into each language's domain
--- translations. Upstream keys win where both define one, so this only adds.
+-- Labels and messages for the OAN widgets and panels, merged into each
+-- language's domain translations. OAN's text wins where a key is already
+-- there, so a change here reaches a registry seeded before it; a key upstream
+-- also defines is listed here only to reword it. Keys upstream alone defines
+-- are left as they are.
 -- A language listed here that the registry does not have is skipped.
 
 WITH oan (language_code, labels) AS (
@@ -14,6 +17,7 @@ WITH oan (language_code, labels) AS (
     "fathers_name_other": "Father''s Name (Primary Language)",
     "grandfathers_name_other": "Grandfather''s Name (Primary Language)",
     "primary_language": "Primary Language",
+    "birth_date_ec": "Birth Date (Ethiopian)",
     "farmer_photo": "Farmer Photo",
     "oan_photo_upload": "Upload photo",
     "oan_photo_replace": "Replace photo",
@@ -21,8 +25,8 @@ WITH oan (language_code, labels) AS (
     "oan_photo_hint": "JPEG, PNG or WebP. On a phone, take a photo or pick one from the gallery.",
     "oan_photo_none": "No photo",
     "oan_photo_bad_type": "Use a JPEG, PNG or WebP image.",
-    "oan_photo_too_large": "The photo is larger than {size} KB after resizing.",
-    "oan_photo_unreadable": "The image could not be read.",
+    "oan_photo_too_large": "The photo is larger than {size} KB after resizing. Choose a smaller image, or take the photo again.",
+    "oan_photo_unreadable": "The image could not be read. Choose another photo, or take it again.",
     "ethiopic_script_only": "Use Ethiopic (Ge''ez) script",
     "is_psnp_user": "PSNP Beneficiary",
     "primary_commodity": "Primary Commodity",
@@ -49,9 +53,12 @@ WITH oan (language_code, labels) AS (
     "country_code": "Country Code",
     "is_primary": "Primary",
     "fayda_fin": "Fayda ID (FIN)",
-    "fayda_fin_format": "The Fayda FIN has 12 digits",
+    "fayda_fin_format": "The Fayda FIN has 12 digits. Enter all 12, numbers only, as printed on the Fayda card",
     "fayda_rid": "Fayda RID",
-    "fayda_rid_format": "The Fayda RID has 29 digits",
+    "fayda_rid_format": "The Fayda RID has 29 digits. Enter all 29, numbers only, as printed on the registration slip",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "altitude": "Altitude",
     "odk_farmer_id": "ODK Farmer ID",
     "pula_id": "Pula (Mavuno) ID",
     "has_national_id": "Has National ID",
@@ -123,13 +130,14 @@ WITH oan (language_code, labels) AS (
     "doc_other_purpose": "Other purpose",
     "oan_docs_add": "Add file",
     "oan_docs_none": "No files",
-    "oan_docs_full": "Up to {count} files",
+    "oan_docs_full": "Up to {count} files can be attached here. Remove one to add another.",
     "oan_docs_view": "View",
     "oan_file_attached": "Attached",
     "oan_file_upload": "Upload",
     "oan_file_replace": "Replace",
     "oan_file_remove": "Remove",
-    "oan_file_too_large": "The file is larger than {size} MB.",
+    "oan_file_too_large": "The file is larger than {size} MB. Choose a smaller file, or scan it again at a lower resolution.",
+    "oan_file_bad_type": "{name} cannot be attached here. Choose a {types} file.",
     "oan_map_use_my_location": "Use my location",
     "oan_map_clear": "Clear pin",
     "oan_map_hint": "Click the map where the farmer lives to fill the location; drag to move, scroll or use + and - to zoom.",
@@ -143,6 +151,6 @@ WITH oan (language_code, labels) AS (
   }'::jsonb)
 )
 UPDATE "public"."registry_languages" l
-SET "domain_translation" = (oan.labels || COALESCE(l."domain_translation"::jsonb, '{}'::jsonb))::json
+SET "domain_translation" = (COALESCE(l."domain_translation"::jsonb, '{}'::jsonb) || oan.labels)::json
 FROM oan
 WHERE l."language_code" = oan.language_code;

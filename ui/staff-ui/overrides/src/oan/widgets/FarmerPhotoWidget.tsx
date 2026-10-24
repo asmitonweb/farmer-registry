@@ -34,8 +34,8 @@ const LABELS: Record<string, string> = {
     oan_photo_hint: 'JPEG, PNG or WebP. On a phone, take a photo or pick one from the gallery.',
     oan_photo_none: 'No photo',
     oan_photo_bad_type: 'Use a JPEG, PNG or WebP image.',
-    oan_photo_too_large: 'The photo is larger than {size} KB after resizing.',
-    oan_photo_unreadable: 'The image could not be read.',
+    oan_photo_too_large: 'The photo is larger than {size} KB after resizing. Choose a smaller image, or take the photo again.',
+    oan_photo_unreadable: 'The image could not be read. Choose another photo, or take it again.',
 };
 
 const isSerializedFile = (value: unknown): value is SerializedFile =>

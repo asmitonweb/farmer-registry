@@ -11,7 +11,7 @@ import {
     useWidgetContext,
     type WidgetRootState,
 } from '@openg2p/registry-widgets';
-import { isSerializedFile, openSerializedFile, serializeFile } from './files';
+import { accepts, acceptedTypes, isSerializedFile, openSerializedFile, serializeFile } from './files';
 
 type Config = Record<string, any>;
 
@@ -21,10 +21,11 @@ export const DOCUMENT_SLOT_VARIANT = 'oan-document-slot';
 const LABELS: Record<string, string> = {
     oan_docs_add: 'Add file',
     oan_docs_none: 'No files',
-    oan_docs_full: 'Up to {count} files',
+    oan_docs_full: 'Up to {count} files can be attached here. Remove one to add another.',
     oan_docs_view: 'View',
     oan_file_remove: 'Remove',
-    oan_file_too_large: 'The file is larger than {size} MB.',
+    oan_file_too_large: 'The file is larger than {size} MB. Choose a smaller file, or scan it again at a lower resolution.',
+    oan_file_bad_type: '{name} cannot be attached here. Choose a {types} file.',
 };
 
 /**
@@ -94,8 +95,11 @@ export function DocumentsWidget({ config }: { config: Config }) {
 
     const add = async (picked: File[]) => {
         setMessage(null);
-        const fits = picked.filter((file) => !maxSize || file.size <= maxSize);
-        if (fits.length < picked.length) setMessage(label('oan_file_too_large', { size: Math.round(maxSize / 1048576) }));
+        const wrong = picked.find((file) => !accepts(file, options.accept));
+        const typed = picked.filter((file) => accepts(file, options.accept));
+        const fits = typed.filter((file) => !maxSize || file.size <= maxSize);
+        if (wrong) setMessage(label('oan_file_bad_type', { name: wrong.name, types: acceptedTypes(options.accept) }));
+        else if (fits.length < typed.length) setMessage(label('oan_file_too_large', { size: Math.round(maxSize / 1048576) }));
         const room = slots.length - files.length;
         if (fits.length > room) setMessage(label('oan_docs_full', { count: slots.length }));
         const added = await Promise.all(fits.slice(0, room).map(serializeFile));

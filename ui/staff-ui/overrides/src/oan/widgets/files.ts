@@ -31,6 +31,30 @@ export async function serializeFile(file: File): Promise<SerializedFile> {
     };
 }
 
+/**
+ * Whether a file is one an `accept` list (".pdf,.jpg,image/png", as on a file
+ * input) allows. The input's own filter can be switched to "All files", so a
+ * widget checks again before taking the file. No list accepts any file.
+ */
+export function accepts(file: File, accept: string | undefined): boolean {
+    const allowed = (accept ?? '').split(',').map((a) => a.trim().toLowerCase()).filter(Boolean);
+    if (!allowed.length) return true;
+    const name = file.name.toLowerCase();
+    const type = (file.type || '').toLowerCase();
+    return allowed.some((a) =>
+        a.startsWith('.') ? name.endsWith(a) : a.endsWith('/*') ? type.startsWith(a.slice(0, -1)) : type === a,
+    );
+}
+
+/** An `accept` list as a reader says it: ".pdf,.jpg,.jpeg" -> "PDF, JPG or JPEG". */
+export function acceptedTypes(accept: string | undefined): string {
+    const names = (accept ?? '')
+        .split(',')
+        .map((a) => a.trim().replace(/^\./, '').replace(/\/\*$/, '').toUpperCase())
+        .filter(Boolean);
+    return names.length > 1 ? `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}` : (names[0] ?? '');
+}
+
 /** Open a file not yet uploaded in a new tab. */
 export function openSerializedFile(file: SerializedFile) {
     const bytes = Uint8Array.from(atob(file.data), (c) => c.charCodeAt(0));

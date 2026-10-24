@@ -127,3 +127,20 @@ FROM "public"."g2p_intake_form_ui_tab_sections" t
 WHERE t.tab_section_id = 'oan_tab_section_3'
 ON CONFLICT ("tab_section_id") DO UPDATE SET
   "tab_id" = EXCLUDED."tab_id", "section_id" = EXCLUDED."section_id", "section_order" = EXCLUDED."section_order";
+
+-- The household on the farmer's intake form: its information and its
+-- members, after socio-economic and health, as the previous registry asked
+-- them. Upstream's intake links a form's rows to their parent register
+-- (G2PIntakeFormLinkService): a farmer whose form carries one household row is
+-- linked to that household, and its members to it, so the household is created
+-- with the farmer on approval. Linking an existing household stays the
+-- household lookup at the top of the form; the household intake form keeps
+-- the same sections for a household registered on its own.
+INSERT INTO "public"."g2p_intake_form_ui_tab_sections" ("tab_section_id", "tab_id", "section_id", "section_order")
+SELECT v.tab_section_id, 'a1a4d25a-1cd4-4356-abac-72482721', v.section_id, v.section_order
+FROM (VALUES ('oan_farmer_household_information_intake', 'oan_household_information', 33),
+             ('oan_farmer_household_members_intake', 'household_household_household_member_section_02', 35)
+) v(tab_section_id, section_id, section_order)
+JOIN "public"."g2p_register_sections" s ON s.section_id = v.section_id
+ON CONFLICT ("tab_section_id") DO UPDATE SET
+  "tab_id" = EXCLUDED."tab_id", "section_id" = EXCLUDED."section_id", "section_order" = EXCLUDED."section_order";

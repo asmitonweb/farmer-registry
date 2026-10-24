@@ -101,4 +101,13 @@ BEGIN
   IF missing IS NOT NULL THEN
     RAISE EXCEPTION 'Upstream sections still attached next to their OAN replacement: %', missing;
   END IF;
+
+  -- The household is asked on the farmer's intake form (20_layout.sql).
+  SELECT string_agg(section_id, ', ') INTO missing
+  FROM (VALUES ('oan_household_information'), ('household_household_household_member_section_02')) e(section_id)
+  WHERE NOT EXISTS (SELECT 1 FROM "public"."g2p_intake_form_ui_tab_sections" t
+                    WHERE t.section_id = e.section_id AND t.tab_id = 'a1a4d25a-1cd4-4356-abac-72482721');
+  IF missing IS NOT NULL THEN
+    RAISE EXCEPTION 'Household sections not on the farmer intake form: %', missing;
+  END IF;
 END $$;
