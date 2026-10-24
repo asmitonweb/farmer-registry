@@ -8,6 +8,10 @@ _config = Settings.get_config()
 
 from openg2p_registry_farmer_extension.app import Initializer as FarmerInitializer
 
+# The farmer initializer migrates its mapped classes directly, so the OAN
+# columns must be appended to them before any migration runs.
+from .register_domain import models as _oan_models  # noqa: F401
+
 _logger = logging.getLogger(_config.logging_default_logger_name)
 
 # OAN registers, in parent-before-child order: (register, history, intake form).
