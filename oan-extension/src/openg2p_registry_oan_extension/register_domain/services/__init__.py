@@ -14,6 +14,8 @@ from openg2p_registry_farmer_extension.register_domain.services.domain_validatio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from .derivations import DERIVATIONS, Derivations
+from .registers import FarmerPhoneService
 from .widget_rules import Rules, check_record, collect_rules
 
 # Section metadata is seed data that can change without a restart.
@@ -49,9 +51,14 @@ async def _load() -> tuple[Rules, dict[str, str], dict[str, str]]:
 
 
 class WidgetRuleValidation:
-    """Adds the section widgets' value rules to a register's domain checks."""
+    """Adds the derived values and the section widgets' value rules to a
+    register's domain checks: derive first, so the farmer checks see them."""
+
+    _derive_first = False
 
     async def validate_domain_attributes(self, records: list[dict]):
+        if type(self)._derive_first:
+            await self.derive(records)
         if type(self)._upstream_validates:
             await super().validate_domain_attributes(records)
         rules, registers, messages = await _load()
@@ -63,9 +70,14 @@ class WidgetRuleValidation:
             validation_error("; ".join(dict.fromkeys(problems)))
 
 
+_PREFIX = "G2PRegisterDomainService"
+
+
 def _with_widget_rules(name: str, base: type) -> type:
     upstream = base.validate_domain_attributes is not G2PRegisterDomainService.validate_domain_attributes
-    return type(name, (WidgetRuleValidation, base), {"__module__": __name__, "_upstream_validates": upstream})
+    derivations = DERIVATIONS.get(name[len(_PREFIX):], Derivations)
+    return type(name, (WidgetRuleValidation, derivations, base),
+                {"__module__": __name__, "_upstream_validates": upstream, "_derive_first": True})
 
 
 # One subclass per farmer domain service, under the same name, so every
@@ -73,9 +85,14 @@ def _with_widget_rules(name: str, base: type) -> type:
 for _name in dir(_farmer):
     _base = getattr(_farmer, _name)
     if (
-        _name.startswith("G2PRegisterDomainService")
+        _name.startswith(_PREFIX)
         and isinstance(_base, type)
         and issubclass(_base, G2PRegisterDomainService)
         and _base is not G2PRegisterDomainService
     ):
         globals()[_name] = _with_widget_rules(_name, _base)
+
+# OAN's own registers.
+for _name, _service in (("FarmerPhone", FarmerPhoneService),):
+    globals()[_PREFIX + _name] = type(_PREFIX + _name, (WidgetRuleValidation, _service),
+                                      {"__module__": __name__, "_upstream_validates": True})

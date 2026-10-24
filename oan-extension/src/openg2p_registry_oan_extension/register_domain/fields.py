@@ -10,7 +10,9 @@ which is how core finds them. Everything else about a field (label, widget,
 validation, dropdown list) is seed metadata.
 """
 
-from sqlalchemy import Boolean, Numeric, String, Text
+from datetime import date
+
+from sqlalchemy import Boolean, Date, Numeric, String, Text
 
 # register mnemonic -> {field: (column type, python type)}
 OAN_FIELDS: dict[str, dict[str, tuple]] = {
@@ -27,10 +29,56 @@ OAN_FIELDS: dict[str, dict[str, tuple]] = {
         "last_name_other": (String, str),
         # Productive Safety Net Programme beneficiary.
         "is_psnp_user": (Boolean, bool),
+        # Ethiopian calendar twin of birth_date, derived from it.
+        "birth_date_ec": (String, str),
+        # A second, local or community language (LANGUAGE list).
+        "local_language": (String, str),
+        "is_household_head": (Boolean, bool),
+        # Identifiers, as attributes of the farmer (OpenG2P's advice for the
+        # migration): the Fayda FIN is upstream's foundational_id; the Fayda
+        # registration id (RID) until a FIN is issued; the ODK Farmer ID; and
+        # the Pula (Mavuno) ID, for a later Pula update to the same farmer.
+        "rid": (String, str),
+        "odk_farmer_id": (String, str),
+        "pula_id": (String, str),
+        # Who collected the record, where and when: taken from the submission
+        # and the enumerator's device, never typed on the form.
+        "enumerator_name": (String, str),
+        "enumerator_user_id": (String, str),
+        "data_collection_date": (Date, date),
+        "enumerator_latitude": (Numeric(10, 7), float),
+        "enumerator_longitude": (Numeric(10, 7), float),
+        "enumerator_altitude": (Numeric(10, 2), float),
+        "enumerator_accuracy": (Numeric(10, 2), float),
+        # Derived from the farmer's active lands, in hectares.
+        "total_land_area": (Numeric(16, 6), float),
+        "total_land_owned_area": (Numeric(16, 6), float),
+        "total_land_rent_area": (Numeric(16, 6), float),
+        "total_land_crop_sharing_area": (Numeric(16, 6), float),
+        "land_ownership": (String, str),  # OWNER, TENANT or HYBRID
+        # Names of the units in geo_code_hierarchy_json, for lists and search.
+        "region_name": (String, str),
+        "zone_name": (String, str),
+        "woreda_name": (String, str),
+        "kebele_name": (String, str),
+    },
+    "HouseholdMember": {
+        "odk_member_id": (String, str),  # the ODK Member ID, as an attribute
+    },
+    "Household": {
+        "father_included": (Boolean, bool),
+        "mother_included": (Boolean, bool),
     },
     "Land": {
         "land_id": (String, str),  # farmer-assigned or external parcel identifier
         "remark": (Text, str),
+        "land_kebele": (String, str),
+        # Derived: land_size in hectares, and whether a certificate is on file.
+        "area_in_hectare": (Numeric(16, 6), float),
+        "certificate_provided": (Boolean, bool),
+    },
+    "Crop": {
+        "planted_date_ec": (String, str),  # Ethiopian calendar twin of planted_date
     },
     "Livestock": {
         "gender": (String, str),  # attribute lookups

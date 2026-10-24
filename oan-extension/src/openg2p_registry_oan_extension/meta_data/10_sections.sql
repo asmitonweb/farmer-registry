@@ -14,7 +14,15 @@ WITH additions (upstream_section_id, oan_section_id, path, items) AS (
   ('farmer_farmer_socio_economic_and_health_section_04',
    'oan_farmer_socio_economic_and_health',
    '{panels,0,panels,1,widgets}'::text[],
-   '[{"widget": "select", "widget-id": "is_psnp_user", "widget-type": "input", "widget-label": "is_psnp_user",
+   -- And the other source of income, asked when the source is "Others".
+   '[{"widget": "text", "widget-id": "source_of_income_other", "widget-type": "input", "widget-label": "source_of_income_other",
+      "widget-readonly": false, "widget-required": false,
+      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.source_of_income_other",
+      "widget-data-validation": {"maxLength": 100},
+      "widget-data-options": {"actions": [
+        {"action": "show", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.source_of_income", "value": "SOI_OTHERS", "operator": "equals"}},
+        {"action": "require", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.source_of_income", "value": "SOI_OTHERS", "operator": "equals"}}]}},
+     {"widget": "select", "widget-id": "is_psnp_user", "widget-type": "input", "widget-label": "is_psnp_user",
       "widget-readonly": false, "widget-required": false,
       "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.is_psnp_user",
       "widget-data-source": {"type": "static", "options": [{"label": "YES", "value": true}, {"label": "NO", "value": false}]}}]'::jsonb),
@@ -38,7 +46,41 @@ WITH additions (upstream_section_id, oan_section_id, path, items) AS (
    '[{"widget": "text", "column-key": "land_id", "widget-type": "input", "widget-label": "land_id",
       "widget-readonly": false, "widget-data-path": "land_id", "widget-data-validation": {"maxLength": 50}},
      {"widget": "text", "column-key": "remark", "widget-type": "input", "widget-label": "remark",
-      "widget-readonly": false, "widget-data-path": "remark", "widget-data-validation": {"maxLength": 500}}]'::jsonb),
+      "widget-readonly": false, "widget-data-path": "remark", "widget-data-validation": {"maxLength": 500}},
+     {"widget": "text", "column-key": "land_kebele", "widget-type": "input", "widget-label": "land_kebele",
+      "widget-readonly": false, "widget-data-path": "land_kebele", "widget-data-validation": {"maxLength": 100}},
+     {"widget": "file", "column-key": "certificate_storage_id", "widget-type": "input", "widget-label": "land_certificate",
+      "widget-readonly": false, "widget-data-path": "certificate_storage_id"},
+     {"widget": "number", "column-key": "area_in_hectare", "widget-type": "input", "widget-label": "area_in_hectare",
+      "widget-readonly": true, "widget-data-path": "area_in_hectare",
+      "widget-data-format": {"numericType": "decimal", "decimalPlaces": 4, "decimalSeparator": ".", "thousandSeparator": ","}},
+     {"widget": "boolean", "column-key": "certificate_provided", "widget-type": "input", "widget-label": "certificate_provided",
+      "widget-readonly": true, "widget-data-path": "certificate_provided"}]'::jsonb),
+
+  -- Crops: the planting date in the Ethiopian calendar, derived from it.
+  ('farmer_crop_crop_details_section_01', 'oan_farmer_crops', '{panels,0,panels,0,widgets,0,widget-data-columns}'::text[], NULL),
+  ('farmer_crop_crop_details_intake_section_01', 'oan_farmer_crops_intake', '{panels,0,panels,0,widgets,0,widget-data-columns}'::text[], NULL),
+
+  -- Household information: whether the father and the mother live in it.
+  ('household_household_household_information_section_01',
+   'oan_household_information',
+   '{panels,0,panels,2,widgets}'::text[],
+   '[{"widget": "boolean", "widget-id": "father_included", "widget-type": "input", "widget-label": "father_included",
+      "widget-readonly": false, "widget-required": false,
+      "widget-data-path": "9055ab43-c85d-4833-bd00-ca657bb72644.father_included"},
+     {"widget": "boolean", "widget-id": "mother_included", "widget-type": "input", "widget-label": "mother_included",
+      "widget-readonly": false, "widget-required": false,
+      "widget-data-path": "9055ab43-c85d-4833-bd00-ca657bb72644.mother_included"}]'::jsonb),
+
+  -- Household link: whether the farmer heads the household; the household's
+  -- head name follows the answer.
+  ('farmer_household_lookup_section_01',
+   'oan_farmer_household_lookup',
+   '{panels,0,panels,0,widgets}'::text[],
+   '[{"widget": "select", "widget-id": "is_household_head", "widget-type": "input", "widget-label": "is_household_head",
+      "widget-readonly": false, "widget-required": false,
+      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.is_household_head",
+      "widget-data-source": {"type": "static", "options": [{"label": "YES", "value": true}, {"label": "NO", "value": false}]}}]'::jsonb),
 
   -- Livestock tables.
   ('farmer_livestock_livestock_details_section_01', 'oan_farmer_livestock', '{panels,0,panels,0,widgets,0,widget-data-columns}'::text[], NULL),
@@ -61,6 +103,10 @@ shared_columns (oan_section_id, items) AS (
       "widget-readonly": false, "widget-data-path": "production_type",
       "widget-data-source": {"type": "api", "method": "POST", "params": {"attribute_id": "LIVESTOCK_PRODUCTION_TYPE"},
                              "service": "attributes", "endpoint": "values", "labelKey": "value_display", "valueKey": "value_code"}}]'::jsonb) c(cols)
+  UNION ALL
+  SELECT oan_section_id, '[{"widget": "text", "column-key": "planted_date_ec", "widget-type": "input",
+      "widget-label": "planted_date_ec", "widget-readonly": true, "widget-data-path": "planted_date_ec"}]'::jsonb
+  FROM (VALUES ('oan_farmer_crops'), ('oan_farmer_crops_intake')) s(oan_section_id)
   UNION ALL
   -- Each amount shows only when the matching "used" answer is yes.
   SELECT oan_section_id, (
@@ -145,6 +191,23 @@ other AS (
     ORDER BY ord) AS panels
   FROM name_fields
 ),
+-- The farmer's identifiers, as attributes of the farmer: the Fayda FIN
+-- (upstream's foundational_id; upstream's ID authentication section only shows
+-- it), the Fayda RID, the ODK Farmer ID and the Pula (Mavuno) ID.
+ids AS (
+  SELECT jsonb_agg(jsonb_build_object(
+    'panel-id', 'oan_panel_id_' || field, 'panel-orientation', 'vertical', 'widgets', jsonb_build_array(
+      jsonb_build_object('widget', 'text', 'widget-id', field, 'widget-type', 'input', 'widget-label', label,
+        'widget-readonly', false, 'widget-required', false,
+        'widget-data-path', 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.' || field,
+        'widget-data-validation', validation)))
+    ORDER BY ord) AS panels
+  FROM (VALUES
+    (1, 'foundational_id', 'fayda_fin', '{"pattern": "^[0-9]{12}$", "patternMessage": "fayda_fin_format"}'::jsonb),
+    (2, 'rid', 'fayda_rid', '{"pattern": "^[0-9]{29}$", "patternMessage": "fayda_rid_format"}'::jsonb),
+    (3, 'odk_farmer_id', 'odk_farmer_id', '{"maxLength": 64}'::jsonb),
+    (4, 'pula_id', 'pula_id', '{"maxLength": 64}'::jsonb)) f(ord, field, label, validation)
+),
 rows AS (
   SELECT jsonb_build_array(
     jsonb_build_object('panel-id', 'oan_panel_language', 'panel-orientation', 'horizontal', 'panels', jsonb_build_array(
@@ -158,16 +221,27 @@ rows AS (
       jsonb_build_object('panel-id', 'oan_panel_language_spacer_1', 'panel-orientation', 'vertical', 'widgets', '[]'::jsonb),
       jsonb_build_object('panel-id', 'oan_panel_language_spacer_2', 'panel-orientation', 'vertical', 'widgets', '[]'::jsonb))),
     jsonb_build_object('panel-id', 'oan_panel_names_amh', 'panel-orientation', 'horizontal', 'panels', amharic.panels),
-    jsonb_build_object('panel-id', 'oan_panel_names_other', 'panel-orientation', 'horizontal', 'panels', other.panels)) AS items
-  FROM amharic, other
+    jsonb_build_object('panel-id', 'oan_panel_names_other', 'panel-orientation', 'horizontal', 'panels', other.panels),
+    jsonb_build_object('panel-id', 'oan_panel_ids', 'panel-orientation', 'horizontal', 'panels', ids.panels)) AS items
+  FROM amharic, other, ids
 ),
--- Upstream's panels with the name widgets relabelled; nothing else changes.
+-- Upstream's panels with the name widgets relabelled, and the birth date taken
+-- by OAN's Ethiopian calendar date widget (ui/staff-ui/overrides/src/oan/widgets/),
+-- which saves the Gregorian birth_date, as upstream's does, and its Ethiopian
+-- calendar twin birth_date_ec. Its conditions (disabled once an age is typed,
+-- no future date) stay upstream's. Nothing else changes.
 upstream_panels AS (
   SELECT u.section_id, jsonb_agg(
     CASE WHEN jsonb_typeof(p->'panels') = 'array' THEN jsonb_set(p, '{panels}', (
       SELECT jsonb_agg(CASE WHEN jsonb_typeof(c->'widgets') = 'array' THEN jsonb_set(c, '{widgets}', (
         SELECT COALESCE(jsonb_agg(w || COALESCE((SELECT jsonb_build_object('widget-label', r.label)
                                                  FROM relabel r WHERE r.widget_id = w->>'widget-id'), '{}'::jsonb)
+                                    || CASE WHEN w->>'widget-id' = 'birth_date' THEN jsonb_build_object(
+                                         'widget', 'oan-ethiopic-date',
+                                         'widget-data-path', jsonb_build_object(
+                                           'value', w->>'widget-data-path',
+                                           'ethiopic', 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.birth_date_ec'))
+                                       ELSE '{}'::jsonb END
                                   ORDER BY wi), '[]'::jsonb)
         FROM jsonb_array_elements(c->'widgets') WITH ORDINALITY x(w, wi))) ELSE c END ORDER BY ci)
       FROM jsonb_array_elements(p->'panels') WITH ORDINALITY y(c, ci))) ELSE p END
@@ -216,6 +290,11 @@ ON CONFLICT ("section_id") DO UPDATE SET
 -- selects the OAN widget; every other header-section stays upstream's. It is
 -- attached to the intake form only (20_layout.sql), so the detail view does not
 -- get a second picker for the same field.
+--
+-- The section also records where the enumerator is when the form is filled
+-- (widget oan-enumerator-position): the device's position, once, if the
+-- browser is allowed to give it. It shows nothing on the form; the register's
+-- Enumerator tab shows the values.
 INSERT INTO "public"."g2p_register_sections" (
   "register_id", "section_id", "section_register_id", "is_core_section", "section_mnemonic",
   "section_description", "documents_required", "no_of_verifications_required", "is_list",
@@ -231,7 +310,13 @@ VALUES (
        "widget-data-path": {"image": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.record_image_document_id",
                             "imageUrl": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.record_image_url"},
        "widget-data-format": {"imageSize": 160, "maxDimension": 1024, "jpegQuality": 0.85},
-       "widget-data-validation": {"maxSizeKb": 2048}}]}]}'::jsonb,
+       "widget-data-validation": {"maxSizeKb": 2048}},
+      {"widget": "oan-enumerator-position", "widget-id": "enumerator-position", "widget-type": "input",
+       "widget-readonly": false, "widget-required": false,
+       "widget-data-path": {"latitude": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.enumerator_latitude",
+                            "longitude": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.enumerator_longitude",
+                            "altitude": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.enumerator_altitude",
+                            "accuracy": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.enumerator_accuracy"}}]}]}'::jsonb,
   false, false, false, false)
 ON CONFLICT ("section_id") DO UPDATE SET
   "register_id" = EXCLUDED."register_id", "section_register_id" = EXCLUDED."section_register_id",

@@ -4,7 +4,13 @@ from openg2p_registry_farmer_extension.register_domain import models as _farmer
 from openg2p_registry_farmer_extension.register_domain.models import *
 from sqlalchemy.orm import mapped_column
 
+from ..derived import farmer_search_text
 from ..fields import OAN_FIELDS
+from .registers import (  # noqa: F401  re-exported for core
+    G2PIntakeFormFarmerPhone,
+    G2PRegisterFarmerPhone,
+    G2PRegisterHistoryFarmerPhone,
+)
 
 
 def _add_oan_columns() -> None:
@@ -18,3 +24,13 @@ def _add_oan_columns() -> None:
 
 
 _add_oan_columns()
+
+
+def _farmer_search_text(self) -> str:
+    return farmer_search_text(self.to_dict())
+
+
+# The farmer's search_text is OAN's narrower one (derived.FARMER_SEARCH_FIELDS),
+# on the register and on the intake form.
+for _cls in (_farmer.G2PRegisterFarmer, _farmer.G2PIntakeFormFarmer):
+    _cls.get_search_text_fields = _farmer_search_text

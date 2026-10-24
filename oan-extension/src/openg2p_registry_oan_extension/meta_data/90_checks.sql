@@ -21,7 +21,23 @@ BEGIN
     ('oan_farmer_livestock', 'production_type'),
     ('oan_farmer_livestock_intake', 'production_type'),
     ('oan_farmer_farm_inputs', 'amount_improved_seed_utilized'),
-    ('oan_farmer_farm_inputs_intake', 'amount_improved_seed_utilized')
+    ('oan_farmer_farm_inputs_intake', 'amount_improved_seed_utilized'),
+    ('oan_farmer_socio_economic_and_health', 'source_of_income_other'),
+    ('oan_farmer_household_lookup', 'is_household_head'),
+    ('oan_household_information', 'father_included'),
+    ('oan_farmer_location', 'farmer_geo_point'),
+    ('oan_farmer_location', 'local_language'),
+    ('oan_farmer_location', 'farmer_geo_hierarchy'),
+    ('oan_farmer_photo', 'enumerator-position'),
+    ('oan_farmer_lands', 'certificate_provided'),
+    ('oan_farmer_crops', 'planted_date_ec'),
+    ('oan_farmer_crops_intake', 'planted_date_ec'),
+    ('oan_farmer_phones', 'phone_number'),
+    ('oan_farmer_personal_identification', 'foundational_id'),
+    ('oan_farmer_personal_identification', 'rid'),
+    ('oan_farmer_personal_identification', 'pula_id'),
+    ('oan_farmer_land_summary', 'total_land_area'),
+    ('oan_farmer_enumerator', 'enumerator_name')
   ) e(section_id, field)
   CROSS JOIN LATERAL (SELECT e.section_id || '.' || e.field AS f) n
   WHERE NOT EXISTS (
@@ -37,7 +53,9 @@ BEGIN
   SELECT string_agg(section_id, ', ') INTO missing
   FROM (VALUES ('oan_farmer_personal_identification'), ('oan_farmer_socio_economic_and_health'),
                ('oan_farmer_membership_details'), ('oan_farmer_lands'), ('oan_farmer_livestock'),
-               ('oan_farmer_farm_inputs')) e(section_id)
+               ('oan_farmer_farm_inputs'), ('oan_farmer_household_lookup'), ('oan_household_information'),
+               ('oan_farmer_location'), ('oan_farmer_crops'), ('oan_farmer_phones'),
+               ('oan_farmer_land_summary'), ('oan_farmer_enumerator')) e(section_id)
   WHERE NOT EXISTS (SELECT 1 FROM "public"."g2p_register_ui_tab_sections" t WHERE t.section_id = e.section_id);
   IF missing IS NOT NULL THEN
     RAISE EXCEPTION 'OAN sections not on any register tab: %', missing;
@@ -46,9 +64,23 @@ BEGIN
   SELECT string_agg(section_id, ', ') INTO missing
   FROM (VALUES ('oan_farmer_personal_identification'), ('oan_farmer_socio_economic_and_health'),
                ('oan_farmer_membership_details'), ('oan_farmer_lands'), ('oan_farmer_livestock_intake'),
-               ('oan_farmer_farm_inputs_intake'), ('oan_farmer_photo')) e(section_id)
+               ('oan_farmer_farm_inputs_intake'), ('oan_farmer_photo'),
+               ('oan_household_information'), ('oan_farmer_location'), ('oan_farmer_crops_intake'),
+               ('oan_farmer_phones')) e(section_id)
   WHERE NOT EXISTS (SELECT 1 FROM "public"."g2p_intake_form_ui_tab_sections" t WHERE t.section_id = e.section_id);
   IF missing IS NOT NULL THEN
     RAISE EXCEPTION 'OAN sections not on the intake form: %', missing;
+  END IF;
+
+  -- A section replaced by an OAN one must not show twice.
+  SELECT string_agg(section_id, ', ') INTO missing
+  FROM (SELECT section_id FROM "public"."g2p_register_ui_tab_sections"
+        UNION ALL SELECT section_id FROM "public"."g2p_intake_form_ui_tab_sections"
+                  WHERE section_id <> 'farmer_household_lookup_section_01') t
+  WHERE section_id IN ('farmer_household_lookup_section_01', 'farmer_farmer_location_section_03',
+                       'farmer_crop_crop_details_section_01', 'farmer_crop_crop_details_intake_section_01',
+                       'household_household_household_information_section_01');
+  IF missing IS NOT NULL THEN
+    RAISE EXCEPTION 'Upstream sections still attached next to their OAN replacement: %', missing;
   END IF;
 END $$;
