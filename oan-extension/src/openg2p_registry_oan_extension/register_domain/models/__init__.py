@@ -1,7 +1,7 @@
 # Everything the farmer extension provides, then OAN's additions below. Core
 # resolves classes by name on this module, so a name defined here wins.
-from openg2p_registry_farmer_extension.register_domain.models import *  # noqa: F401,F403
 from openg2p_registry_farmer_extension.register_domain import models as _farmer
+from openg2p_registry_farmer_extension.register_domain.models import *
 from sqlalchemy.orm import mapped_column
 
 from ..fields import OAN_FIELDS

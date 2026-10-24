@@ -8,8 +8,34 @@ platform's Extensions Contract describes for coexisting extensions.
 
 | Path | Holds |
 |---|---|
-| `register_domain/` | OAN registers and overlay services. Each `__init__` re-exports the farmer one first |
+| `register_domain/fields.py` | the OAN columns on the farmer registers, declared once |
+| `register_domain/models/`, `schemas/` | append those columns to the farmer models and schemas |
+| `register_domain/services/` | the farmer domain services, each extended with the section widgets' value rules (`widget_rules.py`) |
 | `app.py` | the farmer initializer, plus migration of OAN registers |
 | `meta_data/` | the `oan_` metadata layer, applied after the farmer's (`/seed/meta_data/zz-oan/`) |
+| `tests/` | `uv run --no-project --with pytest pytest oan-extension/tests` |
 
 Images are built FROM the published farmer images (`docker/oan/`).
+
+## Metadata layer
+
+Each file runs after the whole farmer seed, in name order:
+
+| File | Does |
+|---|---|
+| `10_sections.sql` | derives each OAN section from the upstream one plus the OAN widgets, so upstream changes carry over on the next seed |
+| `20_layout.sql` | attaches the OAN sections where the upstream ones were, then detaches those by explicit id |
+| `30_translations.sql` | adds labels to each language's domain translations; upstream wording wins on a shared key |
+| `40_deduplication.sql` | the farmer duplicate check, with the father's first name added |
+| `90_checks.sql` | raises an error in the seed log if anything above did not apply |
+
+Upstream section rows are never changed. Code lists (body condition,
+production type, commodities) come from the country pack in Master Data.
+
+## Validation on the server
+
+Core applies coded-value checks itself (`REGISTRY_CORE_VALIDATE_ATTRIBUTE_VALUES`).
+The widgets' `widget-data-validation` rules (pattern, length, range) are applied
+by every register's domain service after the farmer checks, read from the same
+section metadata (cached for five minutes), so a rule is written once.
+Whether a field is required stays with the UI and with the domain code.

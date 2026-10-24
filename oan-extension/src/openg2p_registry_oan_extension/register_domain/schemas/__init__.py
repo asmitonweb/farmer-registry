@@ -1,9 +1,8 @@
 # Everything the farmer extension provides, then OAN's additions below. Core
 # resolves classes by name on this module, so a name defined here wins.
-from typing import Optional
 
-from openg2p_registry_farmer_extension.register_domain.schemas import *  # noqa: F401,F403
 from openg2p_registry_farmer_extension.register_domain import schemas as _farmer
+from openg2p_registry_farmer_extension.register_domain.schemas import *
 
 from ..fields import OAN_FIELDS
 
@@ -11,7 +10,7 @@ from ..fields import OAN_FIELDS
 def _with_oan_fields(name: str, fields: dict) -> type:
     """The farmer schema of that name, plus the OAN fields as optional."""
     base = getattr(_farmer, name)
-    annotations = {field: Optional[py_type] for field, (_, py_type) in fields.items()}
+    annotations = {field: py_type | None for field, (_, py_type) in fields.items()}
     namespace = {"__annotations__": annotations, "__module__": __name__, **{f: None for f in fields}}
     return type(name, (base,), namespace)
 
