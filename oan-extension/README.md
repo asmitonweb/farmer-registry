@@ -13,6 +13,7 @@ platform's Extensions Contract describes for coexisting extensions.
 | `register_domain/services/` | the farmer domain services, each extended with the section widgets' value rules (`widget_rules.py`) |
 | `app.py` | the farmer initializer, plus migration of OAN registers |
 | `meta_data/` | the `oan_` metadata layer, applied after the farmer's (`/seed/meta_data/zz-oan/`) |
+| `seed/` | the db-seed entrypoint: sample people come from Master Data (the country pack's `samples/`) instead of the Kamuntu demo files; `OAN_SAMPLES_FROM_MASTER_DATA=false` keeps the farmer seed's own |
 | `tests/` | `uv run --no-project --with pytest pytest oan-extension/tests` |
 
 Images are built FROM the published farmer images (`docker/oan/`). The staff
