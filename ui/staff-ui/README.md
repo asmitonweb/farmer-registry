@@ -35,6 +35,14 @@ npm start              # apply overrides, skip clone, start the production serve
 npm run reset          # delete .app/ and clone again
 ```
 
+## OAN dashboard background
+
+In the configurator, edit a custom theme's **Dashboard Image** and save it. Select
+that theme in Registry Details if it is not already active, then reload the home
+page. OAN displays the image as a single, centered, cover-sized background. The
+pattern and illustration below the cards are removed. Removing the image leaves
+the theme's primary background color. Factory themes remain read-only.
+
 ## Docker
 
 The image has no `.app/`, so `npm install` clones once. `npm run build` then skips the clone and applies `overrides/` before the Next build.
