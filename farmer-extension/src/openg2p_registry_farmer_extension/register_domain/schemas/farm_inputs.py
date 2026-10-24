@@ -1,7 +1,6 @@
 from typing import Optional
 
 from openg2p_registry_core.schemas import G2PRegisterBaseSchema, G2PRegisterHistorySchema, G2PIntakeFormSchemaBase
-from .oan import OANSchemaFarmInputs  # OAN columns, see oan.py
 
 
 class G2PSchemaFarmInputs:
@@ -15,7 +14,7 @@ class G2PSchemaFarmInputs:
     access_to_finance: Optional[bool] = None
 
 
-class G2PRegisterSchemaFarmInputs(G2PRegisterBaseSchema, G2PSchemaFarmInputs, OANSchemaFarmInputs):
+class G2PRegisterSchemaFarmInputs(G2PRegisterBaseSchema, G2PSchemaFarmInputs):
     """
     Schema for Farm Inputs register.
     Inherits fields from G2PRegisterBaseSchema.
@@ -30,7 +29,7 @@ class G2PRegisterHistorySchemaFarmInputs(G2PRegisterHistorySchema):
     """
 
 
-class G2PIntakeFormSchemaFarmInputs(G2PIntakeFormSchemaBase, G2PRegisterBaseSchema, G2PSchemaFarmInputs, OANSchemaFarmInputs):
+class G2PIntakeFormSchemaFarmInputs(G2PIntakeFormSchemaBase, G2PRegisterBaseSchema, G2PSchemaFarmInputs):
     """
     Schema for Farm Inputs intake form.
     Inherits fields from G2PRegisterBaseSchema.

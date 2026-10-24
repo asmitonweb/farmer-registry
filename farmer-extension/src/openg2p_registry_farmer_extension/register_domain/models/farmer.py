@@ -7,7 +7,6 @@ from openg2p_registry_core.models import (
 )
 from ..services import G2PRegisterDomainServiceFarmer
 from .enums import DisabilityTypeEnum, DisabilitySeverityEnum, SourceOfIncomeEnum, EducationalLevelEnum
-from .oan import OANFarmer  # OAN columns, see oan.py
 
 
 class G2PFarmer:
@@ -25,7 +24,7 @@ class G2PFarmer:
 
 
 # All Register classes should have the prefix G2PRegister
-class G2PRegisterFarmer(G2PRegister, G2PPerson, G2PGeo, G2PFarmer, OANFarmer):
+class G2PRegisterFarmer(G2PRegister, G2PPerson, G2PGeo, G2PFarmer):
     __tablename__ = "g2p_register_farmers"
 
     def get_record_name_fields(self) -> str:
@@ -38,11 +37,11 @@ class G2PRegisterFarmer(G2PRegister, G2PPerson, G2PGeo, G2PFarmer, OANFarmer):
 
 
 # All Register History classes should have the prefix G2PRegisterHistory
-class G2PRegisterHistoryFarmer(G2PRegisterHistory, G2PPersonHistory, G2PGeoHistory, G2PFarmer, OANFarmer):
+class G2PRegisterHistoryFarmer(G2PRegisterHistory, G2PPersonHistory, G2PGeoHistory, G2PFarmer):
     __tablename__ = "g2p_register_history_farmers"
 
 # All Intake Form classes should have the prefix G2PIntakeForm
-class G2PIntakeFormFarmer(G2PIntakeForm, G2PRegister, G2PPerson, G2PGeo, G2PFarmer, OANFarmer):
+class G2PIntakeFormFarmer(G2PIntakeForm, G2PRegister, G2PPerson, G2PGeo, G2PFarmer):
     __tablename__ = "g2p_intake_form_farmers"
 
     async def get_link_internal_record_id(self, session):

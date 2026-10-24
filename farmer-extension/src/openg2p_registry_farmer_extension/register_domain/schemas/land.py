@@ -7,7 +7,6 @@ from openg2p_registry_core.schemas import (
 )
 from .address import G2PAddressLinesSchema
 from ..models.enums import LandOwnershipTypeEnum, LandSizeUnitEnum, CurrentLandUseEnum, FarmingTypeEnum
-from .oan import OANSchemaLand  # OAN columns, see oan.py
 
 
 class G2PSchemaLand:
@@ -23,7 +22,7 @@ class G2PSchemaLand:
     means_of_acquisition: Optional[str] = None
 
 
-class G2PRegisterSchemaLand(G2PRegisterBaseSchema, G2PGeoSchema, G2PAddressLinesSchema, G2PGeoShapeSchema, G2PSchemaLand, OANSchemaLand):
+class G2PRegisterSchemaLand(G2PRegisterBaseSchema, G2PGeoSchema, G2PAddressLinesSchema, G2PGeoShapeSchema, G2PSchemaLand):
     """
     Schema for Land/Farm Details register.
     Inherits fields from G2PRegisterBaseSchema, G2PGeoSchema, and G2PGeoShapeSchema.
@@ -38,7 +37,7 @@ class G2PRegisterHistorySchemaLand(G2PRegisterHistorySchema, G2PGeoHistorySchema
     """
 
 
-class G2PIntakeFormSchemaLand(G2PIntakeFormSchemaBase, G2PRegisterBaseSchema, G2PGeoSchema, G2PAddressLinesSchema, G2PGeoShapeSchema, G2PSchemaLand, OANSchemaLand):
+class G2PIntakeFormSchemaLand(G2PIntakeFormSchemaBase, G2PRegisterBaseSchema, G2PGeoSchema, G2PAddressLinesSchema, G2PGeoShapeSchema, G2PSchemaLand):
     """
     Schema for Land/Farm Details intake form.
     Inherits fields from G2PRegisterBaseSchema, G2PGeoSchema, and G2PGeoShapeSchema.
