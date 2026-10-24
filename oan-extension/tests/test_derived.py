@@ -65,29 +65,22 @@ def test_geo_names():
     assert derived.geo_names(None) == dict.fromkeys(("region_name", "zone_name", "woreda_name", "kebele_name"))
 
 
-def test_sync_ethiopic_gregorian_wins():
+def test_ethiopic_twin_follows_the_gregorian_date():
     record = {"birth_date": "1984-08-06", "birth_date_ec": "1900-01-01"}
-    derived.sync_ethiopic(record, "birth_date", "birth_date_ec")
+    derived.ethiopic_twin(record, "birth_date", "birth_date_ec")
     assert record["birth_date_ec"] == "1976-11-30"
 
 
-def test_sync_ethiopic_from_ethiopian_only():
-    record = {"birth_date": None, "birth_date_ec": "2016-01-01"}
-    derived.sync_ethiopic(record, "birth_date", "birth_date_ec")
-    assert record["birth_date"] == "2023-09-12"
+def test_ethiopic_twin_is_cleared_with_the_date():
+    record = {"birth_date": None, "birth_date_ec": "1976-11-30"}
+    derived.ethiopic_twin(record, "birth_date", "birth_date_ec")
+    assert record["birth_date_ec"] is None
 
 
-def test_sync_ethiopic_leaves_partial_updates_alone():
+def test_ethiopic_twin_leaves_partial_updates_alone():
     record = {"gender": "MALE"}
-    derived.sync_ethiopic(record, "birth_date", "birth_date_ec")
+    derived.ethiopic_twin(record, "birth_date", "birth_date_ec")
     assert record == {"gender": "MALE"}
-
-
-def test_sync_ethiopic_rejects_bad_dates():
-    with pytest.raises(derived.DerivationError):
-        derived.sync_ethiopic({"birth_date_ec": "2016-13-06"}, "birth_date", "birth_date_ec")
-    with pytest.raises(derived.DerivationError):
-        derived.sync_ethiopic({"birth_date_ec": "06/01/2016"}, "birth_date", "birth_date_ec")
 
 
 @pytest.mark.parametrize("typed", ["+251 912 345 678", "0912345678", "912345678", "251912345678"])

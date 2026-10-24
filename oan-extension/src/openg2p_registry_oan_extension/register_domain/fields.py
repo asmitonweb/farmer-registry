@@ -8,6 +8,10 @@ same from outside: models/ appends each column to the three mapped classes, and
 schemas/ subclasses the register and intake schemas under their own names,
 which is how core finds them. Everything else about a field (label, widget,
 validation, dropdown list) is seed metadata.
+
+Every field the previous registries kept (Gen1 g2p_ati and the COSS farmer
+registry) has a column here or upstream, so a migration loses nothing; the
+README's migration map names the column for each.
 """
 
 from datetime import date
@@ -61,13 +65,42 @@ OAN_FIELDS: dict[str, dict[str, tuple]] = {
         "zone_name": (String, str),
         "woreda_name": (String, str),
         "kebele_name": (String, str),
+        # Asked by the previous registry.
+        "has_national_id": (Boolean, bool),
+        "is_farmer": (Boolean, bool),
+        "farming_type": (String, str),  # FARMING_TYPE list
+        # Kept from the previous registries, not asked on the form: the father's
+        # own name (COSS kept it apart from the farmer's middle name), where the
+        # record came from, the ODK submission, the duplicate flag and the
+        # record's workflow state there.
+        "father_first_name": (String, str),
+        "father_middle_name": (String, str),
+        "father_last_name": (String, str),
+        "import_source": (String, str),
+        "odk_instance_id": (String, str),
+        "is_duplicated": (Boolean, bool),
+        "legacy_state": (String, str),
+        # The kind of document uploaded in each documents category; the files
+        # are the record's documents (12_form_sections.sql).
+        "identity_document_type": (String, str),
+        "land_document_type": (String, str),
+        "farmer_document_type": (String, str),
+        "bank_document_type": (String, str),
+        "representative_document_type": (String, str),
+        "other_document_purpose": (String, str),
+        "other_document_name": (String, str),
     },
     "HouseholdMember": {
         "odk_member_id": (String, str),  # the ODK Member ID, as an attribute
+        "birth_date_ec": (String, str),  # Ethiopian calendar twin of birth_date
+        # A member's own land certificate, as COSS kept it.
+        "certificate_storage_id": (Text, str),
+        "certificate_provided": (Boolean, bool),
     },
     "Household": {
         "father_included": (Boolean, bool),
         "mother_included": (Boolean, bool),
+        "other_farmer_in_household": (Boolean, bool),
     },
     "Land": {
         "land_id": (String, str),  # farmer-assigned or external parcel identifier
@@ -79,13 +112,26 @@ OAN_FIELDS: dict[str, dict[str, tuple]] = {
     },
     "Crop": {
         "planted_date_ec": (String, str),  # Ethiopian calendar twin of planted_date
+        "is_diseased": (Boolean, bool),
+        "disease_type": (String, str),  # INFESTATION_AGENT list
     },
     "Livestock": {
         "gender": (String, str),  # attribute lookups
         "body_condition": (String, str),
         "production_type": (String, str),
+        "collected_date": (Date, date),
+        "collected_date_ec": (String, str),  # Ethiopian calendar twin of collected_date
+        "season": (String, str),  # CROP_SEASON list
+        "is_diseased": (Boolean, bool),
+        "disease_type": (String, str),
     },
     "FarmInputs": {
+        # Upstream's water_source is the crops'; the previous registry asked the
+        # livestock's too, and the irrigation and machinery used.
+        "livestock_water_source": (String, str),  # WATER_SOURCE list
+        "irrigation_type": (String, str),  # IRRIGATION_METHOD list
+        "machinery_type": (String, str),  # FARM_MACHINERY list
+        "finance_access_type": (String, str),
         "amount_fertilizer_utilized": (Numeric(12, 3), float),
         "amount_pesticide_utilized": (Numeric(12, 3), float),
         "amount_insecticide_utilized": (Numeric(12, 3), float),

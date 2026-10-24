@@ -1,5 +1,6 @@
--- OAN sections: each one is an upstream section plus the OAN widgets, and the
--- intake photo section.
+-- OAN table sections: each one is an upstream section with OAN columns added,
+-- plus the household link and the intake photo section. The form sections
+-- (three columns of widgets) are laid out in 12_form_sections.sql.
 --
 -- The image copies this folder to /seed/meta_data/zz-oan/, so it runs after the
 -- farmer seed has upserted its own rows. Every OAN row is derived from the
@@ -10,36 +11,13 @@
 -- Sections that only gain widgets: the items are appended to the array at path.
 WITH additions (upstream_section_id, oan_section_id, path, items) AS (
   VALUES
-  -- Socio-economic: Productive Safety Net Programme beneficiary.
-  ('farmer_farmer_socio_economic_and_health_section_04',
-   'oan_farmer_socio_economic_and_health',
-   '{panels,0,panels,1,widgets}'::text[],
-   -- And the other source of income, asked when the source is "Others".
-   '[{"widget": "text", "widget-id": "source_of_income_other", "widget-type": "input", "widget-label": "source_of_income_other",
-      "widget-readonly": false, "widget-required": false,
-      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.source_of_income_other",
-      "widget-data-validation": {"maxLength": 100},
-      "widget-data-options": {"actions": [
-        {"action": "show", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.source_of_income", "value": "SOI_OTHERS", "operator": "equals"}},
-        {"action": "require", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.source_of_income", "value": "SOI_OTHERS", "operator": "equals"}}]}},
-     {"widget": "select", "widget-id": "is_psnp_user", "widget-type": "input", "widget-label": "is_psnp_user",
-      "widget-readonly": false, "widget-required": false,
-      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.is_psnp_user",
-      "widget-data-source": {"type": "static", "options": [{"label": "YES", "value": true}, {"label": "NO", "value": false}]}}]'::jsonb),
-
-  -- Membership: the cluster's focal commodity, shown for cluster members.
-  ('farmer_membership_membership_details_01',
-   'oan_farmer_membership_details',
-   '{panels,0,panels,2,widgets}'::text[],
-   '[{"widget": "select", "widget-id": "primary_commodity", "widget-type": "input", "widget-label": "primary_commodity",
-      "widget-readonly": false, "widget-required": false,
-      "widget-data-path": "495f251c-83a5-4025-a307-1925712c9d0b.primary_commodity",
-      "widget-data-source": {"type": "api", "method": "POST", "params": {"attribute_id": "CROP_COMMODITY"},
-                             "service": "attributes", "endpoint": "values", "labelKey": "value_display", "valueKey": "value_code"},
-      "widget-data-options": {"actions": [
-        {"action": "show", "condition": {"field": "495f251c-83a5-4025-a307-1925712c9d0b.is_farmer_cluster_member", "value": true, "operator": "equals"}}]}}]'::jsonb),
-
-  -- Lands table (the register and the intake form share this section).
+  -- Lands table (the register and the intake form share this section). The
+  -- land certificate cell is OAN's widget (oan-file-cell): upstream's file
+  -- widget cannot be used in a table cell, because the table hides labels in
+  -- cells and its upload button is one. A row shows "Attached" once it has a
+  -- file: the table formats a cell with a "pattern" by filling its X
+  -- characters, so a pattern without any is shown as it is. The area in
+  -- hectares is derived from the size and unit when the row is saved.
   ('farmer_farm_farm_details_section_01',
    'oan_farmer_lands',
    '{panels,0,panels,0,widgets,0,widget-data-columns}'::text[],
@@ -49,28 +27,17 @@ WITH additions (upstream_section_id, oan_section_id, path, items) AS (
       "widget-readonly": false, "widget-data-path": "remark", "widget-data-validation": {"maxLength": 500}},
      {"widget": "text", "column-key": "land_kebele", "widget-type": "input", "widget-label": "land_kebele",
       "widget-readonly": false, "widget-data-path": "land_kebele", "widget-data-validation": {"maxLength": 100}},
-     {"widget": "file", "column-key": "certificate_storage_id", "widget-type": "input", "widget-label": "land_certificate",
-      "widget-readonly": false, "widget-data-path": "certificate_storage_id"},
+     {"widget": "oan-file-cell", "column-key": "certificate_storage_id", "widget-type": "input",
+      "widget-label": "land_certificate", "widget-readonly": false, "widget-data-path": "certificate_storage_id",
+      "widget-data-options": {"accept": ".pdf,.jpg,.jpeg,.png", "maxSize": 5242880},
+      "widget-data-format": {"pattern": "Attached"}},
      {"widget": "number", "column-key": "area_in_hectare", "widget-type": "input", "widget-label": "area_in_hectare",
       "widget-readonly": true, "widget-data-path": "area_in_hectare",
-      "widget-data-format": {"numericType": "decimal", "decimalPlaces": 4, "decimalSeparator": ".", "thousandSeparator": ","}},
-     {"widget": "boolean", "column-key": "certificate_provided", "widget-type": "input", "widget-label": "certificate_provided",
-      "widget-readonly": true, "widget-data-path": "certificate_provided"}]'::jsonb),
+      "widget-data-format": {"numericType": "decimal", "decimalPlaces": 4, "decimalSeparator": ".", "thousandSeparator": ","}}]'::jsonb),
 
-  -- Crops: the planting date in the Ethiopian calendar, derived from it.
+  -- Crops: whether the crop is diseased, and with what.
   ('farmer_crop_crop_details_section_01', 'oan_farmer_crops', '{panels,0,panels,0,widgets,0,widget-data-columns}'::text[], NULL),
   ('farmer_crop_crop_details_intake_section_01', 'oan_farmer_crops_intake', '{panels,0,panels,0,widgets,0,widget-data-columns}'::text[], NULL),
-
-  -- Household information: whether the father and the mother live in it.
-  ('household_household_household_information_section_01',
-   'oan_household_information',
-   '{panels,0,panels,2,widgets}'::text[],
-   '[{"widget": "boolean", "widget-id": "father_included", "widget-type": "input", "widget-label": "father_included",
-      "widget-readonly": false, "widget-required": false,
-      "widget-data-path": "9055ab43-c85d-4833-bd00-ca657bb72644.father_included"},
-     {"widget": "boolean", "widget-id": "mother_included", "widget-type": "input", "widget-label": "mother_included",
-      "widget-readonly": false, "widget-required": false,
-      "widget-data-path": "9055ab43-c85d-4833-bd00-ca657bb72644.mother_included"}]'::jsonb),
 
   -- Household link: whether the farmer heads the household; the household's
   -- head name follows the answer.
@@ -82,11 +49,13 @@ WITH additions (upstream_section_id, oan_section_id, path, items) AS (
       "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.is_household_head",
       "widget-data-source": {"type": "static", "options": [{"label": "YES", "value": true}, {"label": "NO", "value": false}]}}]'::jsonb),
 
-  -- Livestock tables.
+  -- Livestock tables: gender, condition and production, when the count was
+  -- taken and in which season, and disease.
   ('farmer_livestock_livestock_details_section_01', 'oan_farmer_livestock', '{panels,0,panels,0,widgets,0,widget-data-columns}'::text[], NULL),
   ('farmer_livestock_livestock_details_intake_section_01', 'oan_farmer_livestock_intake', '{panels,0,panels,0,widgets,0,widget-data-columns}'::text[], NULL),
 
-  -- Farm input tables.
+  -- Farm input tables: each amount after its "used" answer, then the
+  -- livestock's water source, irrigation and machinery.
   ('farmer_farm_input_farm_input_details_section_01', 'oan_farmer_farm_inputs', '{panels,0,panels,0,widgets,0,widget-data-columns}'::text[], NULL),
   ('farmer_farm_input_farm_input_details_intake_section_01', 'oan_farmer_farm_inputs_intake', '{panels,0,panels,0,widgets,0,widget-data-columns}'::text[], NULL)
 ),
@@ -102,10 +71,30 @@ shared_columns (oan_section_id, items) AS (
      {"widget": "select", "column-key": "production_type", "widget-type": "input", "widget-label": "production_type",
       "widget-readonly": false, "widget-data-path": "production_type",
       "widget-data-source": {"type": "api", "method": "POST", "params": {"attribute_id": "LIVESTOCK_PRODUCTION_TYPE"},
-                             "service": "attributes", "endpoint": "values", "labelKey": "value_display", "valueKey": "value_code"}}]'::jsonb) c(cols)
+                             "service": "attributes", "endpoint": "values", "labelKey": "value_display", "valueKey": "value_code"}},
+     {"widget": "date", "column-key": "collected_date", "widget-type": "input", "widget-label": "collected_date",
+      "widget-readonly": false, "widget-data-path": "collected_date"},
+     {"widget": "select", "column-key": "season", "widget-type": "input", "widget-label": "season",
+      "widget-readonly": false, "widget-data-path": "season",
+      "widget-data-source": {"type": "api", "method": "POST", "params": {"attribute_id": "CROP_SEASON"},
+                             "service": "attributes", "endpoint": "values", "labelKey": "value_display", "valueKey": "value_code"}},
+     {"widget": "select", "column-key": "is_diseased", "widget-type": "input", "widget-label": "is_diseased",
+      "widget-readonly": false, "widget-data-path": "is_diseased",
+      "widget-data-source": {"type": "static", "options": [{"label": "YES", "value": true}, {"label": "NO", "value": false}]}},
+     {"widget": "text", "column-key": "disease_type", "widget-type": "input", "widget-label": "disease_type",
+      "widget-readonly": false, "widget-data-path": "disease_type", "widget-data-validation": {"maxLength": 100},
+      "widget-data-options": {"actions": [
+        {"action": "show", "condition": {"field": "is_diseased", "value": true, "operator": "equals"}}]}}]'::jsonb) c(cols)
   UNION ALL
-  SELECT oan_section_id, '[{"widget": "text", "column-key": "planted_date_ec", "widget-type": "input",
-      "widget-label": "planted_date_ec", "widget-readonly": true, "widget-data-path": "planted_date_ec"}]'::jsonb
+  SELECT oan_section_id, '[{"widget": "select", "column-key": "is_diseased", "widget-type": "input", "widget-label": "is_diseased",
+      "widget-readonly": false, "widget-data-path": "is_diseased",
+      "widget-data-source": {"type": "static", "options": [{"label": "YES", "value": true}, {"label": "NO", "value": false}]}},
+     {"widget": "select", "column-key": "disease_type", "widget-type": "input", "widget-label": "disease_type",
+      "widget-readonly": false, "widget-data-path": "disease_type",
+      "widget-data-source": {"type": "api", "method": "POST", "params": {"attribute_id": "INFESTATION_AGENT"},
+                             "service": "attributes", "endpoint": "values", "labelKey": "value_display", "valueKey": "value_code"},
+      "widget-data-options": {"actions": [
+        {"action": "show", "condition": {"field": "is_diseased", "value": true, "operator": "equals"}}]}}]'::jsonb
   FROM (VALUES ('oan_farmer_crops'), ('oan_farmer_crops_intake')) s(oan_section_id)
   UNION ALL
   -- Each amount shows only when the matching "used" answer is yes.
@@ -123,6 +112,15 @@ shared_columns (oan_section_id, items) AS (
                  (2, 'amount_pesticide_utilized', 'pesticide_use'),
                  (3, 'amount_insecticide_utilized', 'insecticide_use'),
                  (4, 'amount_improved_seed_utilized', 'improved_seed_use')) a(ord, amount, used))
+  || (SELECT jsonb_agg(jsonb_build_object(
+      'widget', 'select', 'column-key', field, 'widget-type', 'input', 'widget-label', field,
+      'widget-readonly', false, 'widget-data-path', field,
+      'widget-data-source', jsonb_build_object('type', 'api', 'method', 'POST', 'params', jsonb_build_object('attribute_id', list),
+                                               'service', 'attributes', 'endpoint', 'values',
+                                               'labelKey', 'value_display', 'valueKey', 'value_code')) ORDER BY ord)
+      FROM (VALUES (1, 'livestock_water_source', 'WATER_SOURCE'),
+                   (2, 'irrigation_type', 'IRRIGATION_METHOD'),
+                   (3, 'machinery_type', 'FARM_MACHINERY')) l(ord, field, list))
   FROM (VALUES ('oan_farmer_farm_inputs'), ('oan_farmer_farm_inputs_intake')) s(oan_section_id)
 )
 INSERT INTO "public"."g2p_register_sections" (
@@ -152,138 +150,12 @@ ON CONFLICT ("section_id") DO UPDATE SET
   "cr_auto_approve_for_staff_portal" = EXCLUDED."cr_auto_approve_for_staff_portal",
   "cr_auto_approve_for_partner" = EXCLUDED."cr_auto_approve_for_partner";
 
--- Personal identification, laid out as in the previous farmer registry: rows
--- stacked in one vertical panel. Upstream's row comes first, with its first,
--- middle and last name relabelled as the English first, father's and
--- grandfather's name. Then the primary language, the names in Amharic, and the
--- names in the primary language, which appear once a language is chosen and are
--- disabled when it is Amharic. The widget conditions apply rules in order and
--- the last show or hide wins, so "chosen and not Amharic" cannot be one rule.
--- The 1.2 widgets do not render panel titles, so each label names its language.
-WITH relabel (widget_id, label) AS (
-  VALUES ('first_name', 'first_name_eng'), ('middle_name', 'fathers_name_eng'), ('last_name', 'grandfathers_name_eng')
-),
-name_fields (ord, field, label) AS (
-  VALUES (1, 'first_name', 'first_name'), (2, 'middle_name', 'fathers_name'), (3, 'last_name', 'grandfathers_name')
-),
-amharic AS (
-  SELECT jsonb_agg(jsonb_build_object(
-    'panel-id', 'oan_panel_amh_' || field, 'panel-orientation', 'vertical', 'widgets', jsonb_build_array(jsonb_build_object(
-      'widget', 'text', 'widget-id', field || '_amh', 'widget-type', 'input', 'widget-label', label || '_amh',
-      'widget-data-path', 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.' || field || '_amh',
-      'widget-data-validation', jsonb_build_object(
-        'pattern', '^[\u1200-\u137F\u2D80-\u2DDF\uAB00-\uAB2F ]+$', 'maxLength', 100,
-        'patternMessage', 'ethiopic_script_only'))))
-    ORDER BY ord) AS panels
-  FROM name_fields
-),
-other AS (
-  SELECT jsonb_agg(jsonb_build_object(
-    'panel-id', 'oan_panel_other_' || field, 'panel-orientation', 'vertical', 'widgets', jsonb_build_array(jsonb_build_object(
-      'widget', 'text', 'widget-id', field || '_other', 'widget-type', 'input', 'widget-label', label || '_other',
-      'widget-data-path', 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.' || field || '_other',
-      'widget-data-validation', jsonb_build_object('maxLength', 100),
-      'widget-data-options', jsonb_build_object('actions', jsonb_build_array(
-        jsonb_build_object('action', 'show', 'condition', jsonb_build_object(
-          'field', 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken', 'operator', 'notEmpty')),
-        jsonb_build_object('action', 'disable', 'condition', jsonb_build_object(
-          'field', 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken', 'operator', 'equals', 'value', 'AMHARIC')))))))
-    ORDER BY ord) AS panels
-  FROM name_fields
-),
--- The farmer's identifiers, as attributes of the farmer: the Fayda FIN
--- (upstream's foundational_id; upstream's ID authentication section only shows
--- it), the Fayda RID, the ODK Farmer ID and the Pula (Mavuno) ID.
-ids AS (
-  SELECT jsonb_agg(jsonb_build_object(
-    'panel-id', 'oan_panel_id_' || field, 'panel-orientation', 'vertical', 'widgets', jsonb_build_array(
-      jsonb_build_object('widget', 'text', 'widget-id', field, 'widget-type', 'input', 'widget-label', label,
-        'widget-readonly', false, 'widget-required', false,
-        'widget-data-path', 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.' || field,
-        'widget-data-validation', validation)))
-    ORDER BY ord) AS panels
-  FROM (VALUES
-    (1, 'foundational_id', 'fayda_fin', '{"pattern": "^[0-9]{12}$", "patternMessage": "fayda_fin_format"}'::jsonb),
-    (2, 'rid', 'fayda_rid', '{"pattern": "^[0-9]{29}$", "patternMessage": "fayda_rid_format"}'::jsonb),
-    (3, 'odk_farmer_id', 'odk_farmer_id', '{"maxLength": 64}'::jsonb),
-    (4, 'pula_id', 'pula_id', '{"maxLength": 64}'::jsonb)) f(ord, field, label, validation)
-),
-rows AS (
-  SELECT jsonb_build_array(
-    jsonb_build_object('panel-id', 'oan_panel_language', 'panel-orientation', 'horizontal', 'panels', jsonb_build_array(
-      jsonb_build_object('panel-id', 'oan_panel_language_spoken', 'panel-orientation', 'vertical', 'widgets', jsonb_build_array(
-        '{"widget": "select", "widget-id": "language_spoken", "widget-type": "input", "widget-label": "primary_language",
-          "widget-readonly": false, "widget-required": false,
-          "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken",
-          "widget-data-source": {"type": "api", "method": "POST", "params": {"attribute_id": "LANGUAGE"},
-                                 "service": "attributes", "endpoint": "values", "labelKey": "value_display", "valueKey": "value_code"}}'::jsonb)),
-      -- Two empty columns keep the select one column wide, as in the rows below.
-      jsonb_build_object('panel-id', 'oan_panel_language_spacer_1', 'panel-orientation', 'vertical', 'widgets', '[]'::jsonb),
-      jsonb_build_object('panel-id', 'oan_panel_language_spacer_2', 'panel-orientation', 'vertical', 'widgets', '[]'::jsonb))),
-    jsonb_build_object('panel-id', 'oan_panel_names_amh', 'panel-orientation', 'horizontal', 'panels', amharic.panels),
-    jsonb_build_object('panel-id', 'oan_panel_names_other', 'panel-orientation', 'horizontal', 'panels', other.panels),
-    jsonb_build_object('panel-id', 'oan_panel_ids', 'panel-orientation', 'horizontal', 'panels', ids.panels)) AS items
-  FROM amharic, other, ids
-),
--- Upstream's panels with the name widgets relabelled, and the birth date taken
--- by OAN's Ethiopian calendar date widget (ui/staff-ui/overrides/src/oan/widgets/),
--- which saves the Gregorian birth_date, as upstream's does, and its Ethiopian
--- calendar twin birth_date_ec. Its conditions (disabled once an age is typed,
--- no future date) stay upstream's. Nothing else changes.
-upstream_panels AS (
-  SELECT u.section_id, jsonb_agg(
-    CASE WHEN jsonb_typeof(p->'panels') = 'array' THEN jsonb_set(p, '{panels}', (
-      SELECT jsonb_agg(CASE WHEN jsonb_typeof(c->'widgets') = 'array' THEN jsonb_set(c, '{widgets}', (
-        SELECT COALESCE(jsonb_agg(w || COALESCE((SELECT jsonb_build_object('widget-label', r.label)
-                                                 FROM relabel r WHERE r.widget_id = w->>'widget-id'), '{}'::jsonb)
-                                    || CASE WHEN w->>'widget-id' = 'birth_date' THEN jsonb_build_object(
-                                         'widget', 'oan-ethiopic-date',
-                                         'widget-data-path', jsonb_build_object(
-                                           'value', w->>'widget-data-path',
-                                           'ethiopic', 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.birth_date_ec'))
-                                       ELSE '{}'::jsonb END
-                                  ORDER BY wi), '[]'::jsonb)
-        FROM jsonb_array_elements(c->'widgets') WITH ORDINALITY x(w, wi))) ELSE c END ORDER BY ci)
-      FROM jsonb_array_elements(p->'panels') WITH ORDINALITY y(c, ci))) ELSE p END
-    ORDER BY pi) AS panels
-  FROM "public"."g2p_register_sections" u,
-       jsonb_array_elements(u.section_ui_schema->'panels') WITH ORDINALITY z(p, pi)
-  WHERE u.section_id = 'farmer_farmer_personal_identification_section_01'
-  GROUP BY u.section_id
-)
-INSERT INTO "public"."g2p_register_sections" (
-  "register_id", "section_id", "section_register_id", "is_core_section", "section_mnemonic",
-  "section_description", "documents_required", "no_of_verifications_required", "is_list",
-  "section_weightage", "section_ui_schema", "cr_auto_approve_for_bene_portal",
-  "cr_auto_approve_for_agent_portal", "cr_auto_approve_for_staff_portal", "cr_auto_approve_for_partner")
-SELECT u.register_id, 'oan_farmer_personal_identification', u.section_register_id, u.is_core_section,
-       'oan_' || u.section_mnemonic, u.section_description, u.documents_required,
-       u.no_of_verifications_required, u.is_list, u.section_weightage,
-       jsonb_set(u.section_ui_schema, '{panels}', jsonb_build_array(jsonb_build_object(
-         'panel-id', 'oan_panel_personal_rows', 'panel-orientation', 'vertical',
-         'panels', up.panels || rows.items))),
-       u.cr_auto_approve_for_bene_portal, u.cr_auto_approve_for_agent_portal,
-       u.cr_auto_approve_for_staff_portal, u.cr_auto_approve_for_partner
-FROM "public"."g2p_register_sections" u
-JOIN upstream_panels up ON up.section_id = u.section_id
-CROSS JOIN rows
-ON CONFLICT ("section_id") DO UPDATE SET
-  "register_id" = EXCLUDED."register_id", "section_register_id" = EXCLUDED."section_register_id",
-  "is_core_section" = EXCLUDED."is_core_section", "section_mnemonic" = EXCLUDED."section_mnemonic",
-  "section_description" = EXCLUDED."section_description", "documents_required" = EXCLUDED."documents_required",
-  "no_of_verifications_required" = EXCLUDED."no_of_verifications_required", "is_list" = EXCLUDED."is_list",
-  "section_weightage" = EXCLUDED."section_weightage", "section_ui_schema" = EXCLUDED."section_ui_schema",
-  "cr_auto_approve_for_bene_portal" = EXCLUDED."cr_auto_approve_for_bene_portal",
-  "cr_auto_approve_for_agent_portal" = EXCLUDED."cr_auto_approve_for_agent_portal",
-  "cr_auto_approve_for_staff_portal" = EXCLUDED."cr_auto_approve_for_staff_portal",
-  "cr_auto_approve_for_partner" = EXCLUDED."cr_auto_approve_for_partner";
-
 -- Farmer photo for the intake form. The register's detail view already has the
 -- photo in upstream's header section (fr_farmer_header); the intake form has no
 -- header, so without this a photo could only be added after approval.
 --
--- The widget is OAN's own (ui/staff-ui/overrides/src/oan/widgets/): take a photo
--- with the device camera or choose a file, preview, replace, remove. The widget
+-- The widget is OAN's own (ui/staff-ui/overrides/src/oan/widgets/): one picker
+-- (a phone offers its camera or its gallery), preview, replace, remove. The widget
 -- package uploads a section's photo, and sets record_image_document_id, the
 -- field the detail view's header shows, only for widgets of type
 -- "header-section". So the section declares that type, and "widget-variant"

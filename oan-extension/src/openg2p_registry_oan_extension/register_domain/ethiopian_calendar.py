@@ -1,8 +1,8 @@
 """Gregorian <-> Ethiopic (Amete Mihret) calendar conversion.
 
 Pure arithmetic via Julian Day Number, with no dependencies, the same as the
-previous farmer registry's. The staff UI's Ethiopic date widget uses the same
-arithmetic (ui/staff-ui/overrides/src/oan/widgets/ethiopic.ts).
+previous farmer registry's. Dates are entered in the Gregorian calendar; this
+derives their Ethiopian calendar twins on the server.
 
 The Ethiopian year has 13 months -- twelve of 30 days plus Pagumen, a 5 or 6
 day epagomenal month. Month 13 is why an Ethiopic date cannot live in a

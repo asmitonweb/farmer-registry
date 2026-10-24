@@ -28,10 +28,10 @@ const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const DEFAULTS = { maxDimension: 1024, maxSizeKb: 2048, imageSize: 160, jpegQuality: 0.85 };
 
 const LABELS: Record<string, string> = {
-    oan_photo_take: 'Take photo',
-    oan_photo_choose: 'Choose file',
+    oan_photo_upload: 'Upload photo',
+    oan_photo_replace: 'Replace photo',
     oan_photo_remove: 'Remove',
-    oan_photo_hint: 'JPEG, PNG or WebP. Drop an image here or use the buttons.',
+    oan_photo_hint: 'JPEG, PNG or WebP. On a phone, take a photo or pick one from the gallery.',
     oan_photo_none: 'No photo',
     oan_photo_bad_type: 'Use a JPEG, PNG or WebP image.',
     oan_photo_too_large: 'The photo is larger than {size} KB after resizing.',
@@ -72,8 +72,9 @@ async function shrink(file: File, maxDimension: number, quality: number): Promis
 const jpegName = (name: string) => `${name.replace(/\.[^.]+$/, '') || 'photo'}.jpg`;
 
 /**
- * Farmer photo for the intake form: take one with the device camera or choose a
- * file, see it straight away, replace or remove it.
+ * Farmer photo for the intake form: one picker, see it straight away, replace
+ * or remove it. A phone offers its camera or its gallery for an image input,
+ * and a computer a file dialog, so one picker covers both.
  *
  * The picked photo is stored, as the widget package's serialized file, at the
  * widget's "imageUrl" path. On save the staff UI uploads it and sets the field
@@ -91,7 +92,6 @@ export function FarmerPhotoWidget({ config }: { config: Config }) {
     const { t, schemaData } = useWidgetContext();
     const values = useSelector((state: WidgetRootState) => state.widget.values);
     const inputId = useId();
-    const cameraInput = useRef<HTMLInputElement>(null);
     const fileInput = useRef<HTMLInputElement>(null);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
@@ -225,11 +225,8 @@ export function FarmerPhotoWidget({ config }: { config: Config }) {
                 {!readonly && (
                     <>
                         <div className="oan-photo-actions">
-                            <button type="button" className="primary" disabled={disabled} onClick={() => cameraInput.current?.click()}>
-                                {label('oan_photo_take')}
-                            </button>
-                            <button type="button" disabled={disabled} onClick={() => fileInput.current?.click()}>
-                                {label('oan_photo_choose')}
+                            <button type="button" className="primary" disabled={disabled} onClick={() => fileInput.current?.click()}>
+                                {label(preview ? 'oan_photo_replace' : 'oan_photo_upload')}
                             </button>
                             {preview && (
                                 <button
@@ -250,18 +247,6 @@ export function FarmerPhotoWidget({ config }: { config: Config }) {
                                 {error}
                             </span>
                         )}
-                        <input
-                            ref={cameraInput}
-                            id={`${inputId}-camera`}
-                            type="file"
-                            accept={ACCEPTED_TYPES.join(',')}
-                            capture="environment"
-                            hidden
-                            onChange={(event) => {
-                                void accept(event.target.files?.[0]);
-                                event.target.value = '';
-                            }}
-                        />
                         <input
                             ref={fileInput}
                             id={`${inputId}-file`}

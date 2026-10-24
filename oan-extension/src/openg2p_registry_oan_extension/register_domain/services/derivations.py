@@ -6,6 +6,10 @@ pre_approve applies the same changes to the stored payload (as the farmer
 extension does for disability details). Values that depend on other records
 (a farmer's land totals, phones and household head) are refreshed after
 approval and after ingestion.
+
+Dates are Gregorian everywhere they are entered; each register lists its dates
+that also keep an Ethiopian calendar twin in ethiopic_dates, and the twin is
+derived on every way in.
 """
 
 import base64
@@ -27,25 +31,16 @@ from sqlalchemy import select, update
 from sqlalchemy.orm.attributes import flag_modified
 
 from ..derived import (
-    DerivationError,
     ethiopic_of,
+    ethiopic_twin,
     farmer_search_text,
     geo_names,
     hectares,
     land_rollup,
     normalize_phone,
-    sync_ethiopic,
 )
 
 _logger = logging.getLogger("oan-derivations")
-
-
-def _derive(apply, records: list[dict]) -> None:
-    try:
-        for record in records:
-            apply(record)
-    except DerivationError as error:
-        validation_error(str(error))
 
 
 def _json(value):
@@ -80,10 +75,21 @@ async def refresh_farmers_of(change_request, session) -> None:
 
 
 class Derivations:
-    """No derived values; the end of every register's derivation chain."""
+    """The Ethiopian calendar twins of a register's dates; the end of every
+    register's derivation chain."""
+
+    # (Gregorian date field, Ethiopian calendar twin field)
+    ethiopic_dates: tuple[tuple[str, str], ...] = ()
 
     async def derive(self, records: list[dict]) -> None:
-        return None
+        for record in records:
+            for gc_field, ec_field in self.ethiopic_dates:
+                ethiopic_twin(record, gc_field, ec_field)
+
+    async def post_ingest(self, register_id, register_row, session):
+        await super().post_ingest(register_id, register_row, session)
+        for gc_field, ec_field in self.ethiopic_dates:
+            setattr(register_row, ec_field, ethiopic_of(getattr(register_row, gc_field)))
 
     async def derive_payload(self, change_request, session) -> None:
         payload, records = await _payload_records(change_request, session)
@@ -96,7 +102,6 @@ class Derivations:
 
 
 def _farmer_record(record: dict) -> None:
-    sync_ethiopic(record, "birth_date", "birth_date_ec")
     if "geo_code_hierarchy_json" in record:
         record.update(geo_names(_json(record.get("geo_code_hierarchy_json"))))
     if "is_household_head" in record:
@@ -186,11 +191,14 @@ async def _phones_from_list(farmer, session) -> None:
 
 
 class FarmerDerivations(Derivations):
+    ethiopic_dates = (("birth_date", "birth_date_ec"),)
+
     def construct_search_text(self, payload: dict, extra: list[str] | None = None) -> str:
         return farmer_search_text(payload, extra)
 
     async def derive(self, records: list[dict]) -> None:
-        _derive(_farmer_record, records)
+        for record in records:
+            _farmer_record(record)
         await super().derive(records)
 
     async def pre_approve(self, change_request, session):
@@ -204,7 +212,6 @@ class FarmerDerivations(Derivations):
     async def post_ingest(self, register_id, register_row, session):
         await super().post_ingest(register_id, register_row, session)
         row = register_row
-        row.birth_date_ec = ethiopic_of(row.birth_date)
         for field, value in geo_names(_json(row.geo_code_hierarchy_json)).items():
             setattr(row, field, value)
         # The enumerator is whoever submitted the form, on the day it was begun,
@@ -300,7 +307,8 @@ def _land_record(record: dict) -> None:
 
 class LandDerivations(Derivations):
     async def derive(self, records: list[dict]) -> None:
-        _derive(_land_record, records)
+        for record in records:
+            _land_record(record)
         await _save_pending_documents()
         await super().derive(records)
 
@@ -319,21 +327,25 @@ class LandDerivations(Derivations):
         await refresh_farmer(session, register_row.link_internal_record_id)
 
 
-# --- Crop, household ------------------------------------------------------------
+# --- Crop, livestock, household -------------------------------------------------
 
 
-class CropDerivations(Derivations):
-    async def derive(self, records: list[dict]) -> None:
-        _derive(lambda r: sync_ethiopic(r, "planted_date", "planted_date_ec"), records)
-        await super().derive(records)
-
+class _DatesOnly(Derivations):
     async def pre_approve(self, change_request, session):
         await self.derive_payload(change_request, session)
         await super().pre_approve(change_request, session)
 
-    async def post_ingest(self, register_id, register_row, session):
-        await super().post_ingest(register_id, register_row, session)
-        register_row.planted_date_ec = ethiopic_of(register_row.planted_date)
+
+class CropDerivations(_DatesOnly):
+    ethiopic_dates = (("planted_date", "planted_date_ec"),)
+
+
+class LivestockDerivations(_DatesOnly):
+    ethiopic_dates = (("collected_date", "collected_date_ec"),)
+
+
+class HouseholdMemberDerivations(_DatesOnly):
+    ethiopic_dates = (("birth_date", "birth_date_ec"),)
 
 
 def _household_record(record: dict) -> None:
@@ -345,7 +357,8 @@ def _household_record(record: dict) -> None:
 
 class HouseholdDerivations(Derivations):
     async def derive(self, records: list[dict]) -> None:
-        _derive(_household_record, records)
+        for record in records:
+            _household_record(record)
         await super().derive(records)
 
     async def pre_approve(self, change_request, session):
@@ -358,5 +371,7 @@ DERIVATIONS = {
     "Farmer": FarmerDerivations,
     "Land": LandDerivations,
     "Crop": CropDerivations,
+    "Livestock": LivestockDerivations,
     "Household": HouseholdDerivations,
+    "HouseholdMember": HouseholdMemberDerivations,
 }

@@ -28,8 +28,9 @@ with `ui/staff-ui/overrides/` copied on top (`docker/oan/staff-ui.Dockerfile`).
 the one overridden upstream file, `src/shared/widgets/RegistryWidgetProvider.tsx`
 (a single added import).
 
-The farmer photo (`FarmerPhotoWidget.tsx`) takes a photo with the device camera
-or from a file, previews it, and scales it down before upload. The widget
+The farmer photo (`FarmerPhotoWidget.tsx`) has one picker (a phone offers its
+camera or its gallery for an image input), previews the photo, and scales it
+down before upload. The widget
 package uploads a section's photo into `record_image_document_id` only for
 widgets of type `header-section`, so the photo section declares that type with
 `"widget-variant": "oan-farmer-photo"`, and the OAN registration renders the
@@ -46,8 +47,12 @@ Following OpenG2P's review of the previous registry:
 - Location stays on the farmer tab.
 - The farmer's `search_text` holds only what a user types to find a farmer: its
   ids and its names in each language (`derived.FARMER_SEARCH_FIELDS`).
-- Dates are stored Gregorian. The birth date is entered with the Ethiopian
-  calendar widget, and each date has an Ethiopian calendar twin (`*_ec`).
+- Dates are entered and stored in the Gregorian calendar with the registry's
+  own date widget, as OpenG2P does (its ODK forms show Ethiopian dates and
+  still record the Gregorian one). Each register lists the dates that keep an
+  Ethiopian calendar twin (`ethiopic_dates` in `services/derivations.py`), and
+  the domain service derives the twin on every way in: birth dates, planting
+  dates and livestock count dates.
 - The household link on the intake form stays upstream's until OpenG2P's
   design for it is agreed. The household-head question is on the register only.
 
@@ -64,13 +69,40 @@ Besides the farmer photo, `ui/staff-ui/overrides/src/oan/widgets/` registers:
 
 | Widget | Does |
 |---|---|
-| `oan-ethiopic-date` | a date entered in the Ethiopian calendar or the Gregorian one; saves both (`widget-data-path: {value, ethiopic}`) |
-| `oan-geo-point` | an OpenStreetMap map to pin a place, as ODK's map question does; saves latitude, longitude and altitude (device altitude, or the ground elevation at the pin from `elevationUrl`) |
+| `oan-file-cell` | a file in a table cell, such as a land certificate: the table hides labels in its cells, and upstream's file widget is one |
+| `oan-geo-point` | an OpenStreetMap map to pin a place, as ODK's map question does; saves latitude, longitude and altitude (device altitude, or the ground elevation at the pin from `elevationUrl`), and fills the location hierarchy from the pin |
 | `oan-enumerator-position` | renders nothing; records the device's position once, if allowed |
+| `file` with `"widget-variant": "oan-documents"` | a documents category with several files: the first of the category's file widgets lists them all; the others (`oan-document-slot`) render nothing |
 
 The map needs its tile and elevation hosts in the staff UI's CSP (`CSP_SRC_IMG`,
 `CSP_SRC_CONNECT`). The elevation lookup sends the pin's coordinates to that
 service; leave `elevationUrl` out of the section to keep them in.
+
+### Location from the map
+
+The farmer location map is kept to Ethiopia, and the pin fills Region, Zone and
+Woreda; the address lines are typed. The polygons are Master Data's, which seeds
+them with the hierarchy from the country pack (ETH-OAN `boundaries/`, OCHA
+COD-AB, in the openg2p-data fork), so every OAN registry and dashboard has one
+map with the same ids as its location fields. The staff UI reads them through
+`/api/master-data/geo-boundary?level=woreda` (an override route for Master
+Data's `/catalogue/get_geo_boundary`). The woreda under the pin gives a P-code;
+its region and zone are read from Master Data, never from the polygon, so a
+woreda moved to a new zone gets the new one. The geo hierarchy widget then
+shows the chain and asks for the kebele, which has no polygons. A woreda without
+a polygon (new since 2021) is chosen from the lists.
+
+Master Data serves boundaries from its catalogue, which published images have
+from `0.0.0-develop.118`; on an older Master Data the route answers 404, the pin
+still saves its coordinates, and the location is chosen from the lists.
+
+### Documents
+
+Six categories, each with the kind of document and up to five files; only the
+identity document is required (`12_form_sections.sql`). The staff UI stores one
+file per file widget label, so a category is five upstream file widgets
+(`<category>_1` .. `_5`) shown as one list. A new file goes to the first free
+slot; a saved document keeps its slot, since it is stored under that label.
 
 ## Metadata layer
 
@@ -79,8 +111,9 @@ Each file runs after the whole farmer seed, in name order:
 | File | Does |
 |---|---|
 | `05_registers.sql` | the FarmerPhone register, and the location names in the farmer list |
-| `10_sections.sql` | derives each OAN section from the upstream one plus the OAN widgets, so upstream changes carry over on the next seed; adds the intake photo section |
-| `15_sections.sql` | sections with no upstream counterpart: phones, land totals, enumerator, and the location with the map |
+| `10_sections.sql` | the table sections: each upstream one with OAN columns added, so upstream changes carry over on the next seed; the household link and the intake photo section |
+| `12_form_sections.sql` | the form sections as one row of three columns: which widget goes where, upstream's by `widget-id` and OAN's written out (personal identification, socio-economic, membership, household, location, documents) |
+| `15_sections.sql` | sections with no upstream counterpart: phones, land totals, enumerator |
 | `20_layout.sql` | attaches the OAN sections where the upstream ones were, then detaches those by explicit id |
 | `30_translations.sql` | adds labels to each language's domain translations; upstream wording wins on a shared key |
 | `40_deduplication.sql` | the farmer duplicate check, with the father's name (middle name) added |
@@ -89,6 +122,35 @@ Each file runs after the whole farmer seed, in name order:
 Upstream section rows are never changed. Code lists (body condition,
 production type, commodities, languages) come from the country pack in Master Data;
 short fixed lists (phone type) are static options in the section.
+
+## Migration from the previous registries
+
+Every field of the previous registries (Gen1 `g2p_ati`, and the COSS farmer
+registry) has a Gen2 column, so a migration keeps everything. Most keep their
+name; these map:
+
+| Previous field | Gen2 |
+|---|---|
+| `given_name`, `family_name`, `gf_name_eng` | `first_name`, `middle_name`, `last_name` |
+| `*_amh` (Gen1 `first_name_amh`, `family_name_amh`, `gf_name_amh`) | `first_name_amh`, `middle_name_amh`, `last_name_amh` |
+| `*_other`; COSS `*_om` (Afaan Oromo) | `*_other`, with `language_spoken` = `AFAAN_OROMO` for `*_om` |
+| `birthdate_ec`, `collected_ec`, `expiry_date_ec` | derived again from the Gregorian date (`*_ec`) |
+| `age` | `estimated_age` |
+| `is_disabled` | `disabled` |
+| `martial_status`, `education` | `marital_status`, `education_level` |
+| `hh_is_household_head`, `hh_income_type` | `is_household_head`, `source_of_income` |
+| `size_of_family`, `number_of_children_in_family`, `number_of_males_in_family`, `number_of_females_in_family`, `other_family_member_own_land`, `other_farmer_in_hh` | household `size_of_group`, `number_of_children`, `number_of_male_members`, `number_of_female_members`, `other_land_owner`, `other_farmer_in_household` |
+| `do_you_use_*`, `amount_*_utilized`, `crop_water_sources`, `livestock_water_sources`, `access_to_machinery`, `type_of_machinery`, `irrigation_types`, `has_finance_access`, `finance_accesses` | farm inputs `*_use`, `amount_*_utilized`, `water_source`, `livestock_water_source`, `access_to_machinery`, `machinery_type`, `irrigation_type`, `access_to_finance`, `finance_access_type` |
+| cooperative and cluster fields | membership details |
+| land `total_land_area`, `land_certificate`, `certficate_provided`, `ownership_type` | land `land_size` (unit `HECTARE`), `certificate_storage_id`, `certificate_provided`, `land_ownership_type` |
+| crop `crop`, `collected_gc`, `illness_type` | crop `commodity`, `planted_date`, `disease_type` |
+| livestock `number_of_livestock`, `collected_gc`, `illness_type` | livestock `head_count`, `collected_date`, `disease_type` |
+| reg ids (Fayda FIN, RID, ODK farmer and member ack ids) | `foundational_id`, `rid`, `odk_farmer_id`, `odk_member_id` |
+| `farmer_id`, `rejection_reason`, `state`, `rec_import_source`, `odk_instance_id` | `functional_record_id`, `record_status_reason`, `legacy_state`, `import_source`, `odk_instance_id` |
+| COSS `father_*_name`, `is_duplicated`, member `certificate_*`, `woreda_level_value_id` | the same names; `woreda_level_value_id` is in `geo_code_hierarchy_json` |
+
+A previous id's expiry date and status have no column: the identifiers are
+attributes of the farmer, as OpenG2P advised, not rows of an id table.
 
 ## Validation on the server
 

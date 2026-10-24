@@ -10,8 +10,23 @@ import {
     useWidgetContext,
     type WidgetRootState,
 } from '@openg2p/registry-widgets';
+import { loadBoundaries, unitAt } from './boundaries';
 
 type Config = Record<string, any>;
+
+type Boundaries = {
+    url: string;
+    pcodeProperty?: string;
+    geoSource: { service: string; method?: string; levelsEndpoint: string; valuesEndpoint: string };
+};
+type HierarchyEntry = {
+    level_id: string;
+    level: string;
+    level_mnemonic: string;
+    level_value_id: string;
+    level_value_mnemonic: string;
+};
+type Handler = (service: string, endpoint: string, method: string, params: Record<string, unknown>) => Promise<unknown>;
 
 const TILE = 256;
 const DEFAULTS = {
@@ -28,12 +43,14 @@ const DEFAULTS = {
 const LABELS: Record<string, string> = {
     oan_map_use_my_location: 'Use my location',
     oan_map_clear: 'Clear pin',
-    oan_map_hint: 'Click the map to pin the farm; drag to move, scroll or use + and - to zoom.',
+    oan_map_hint: 'Click the map where the farmer lives to fill the location; drag to move, scroll or use + and - to zoom.',
     oan_map_locating: 'Finding your location...',
     oan_map_no_location: 'Your location is not available.',
     oan_map_latitude: 'Latitude',
     oan_map_longitude: 'Longitude',
     oan_map_altitude: 'Altitude (m)',
+    oan_map_outside: 'The pin is outside the country. Place it where the farmer lives.',
+    oan_map_no_boundaries: 'The location could not be filled from the map. Choose it in the location fields.',
 };
 
 // Web Mercator, in pixels of a world 256 * 2^zoom wide.
@@ -58,6 +75,76 @@ const num = (value: unknown): number | null => {
 
 const round = (value: number, places: number) => Number(value.toFixed(places));
 
+const clamp = (value: number, low: number, high: number) => Math.min(Math.max(value, low), high);
+
+// Master Data answers in the registry's envelope, read as the geo hierarchy widget reads it.
+type GeoRow = {
+    level_id: string;
+    level_mnemonic: string;
+    parent_level_id?: string | null;
+    level_value_id: string;
+    level_value_mnemonic?: string;
+};
+type Envelope = { response_payload?: unknown; response_body?: { response_payload?: unknown } } | GeoRow[] | null;
+
+const payload = (response: unknown): GeoRow[] => {
+    const body = response as Envelope;
+    if (Array.isArray(body)) return body;
+    if (Array.isArray(body?.response_payload)) return body.response_payload as GeoRow[];
+    if (Array.isArray(body?.response_body?.response_payload)) return body.response_body.response_payload as GeoRow[];
+    return [];
+};
+
+const parseHierarchy = (raw: unknown): HierarchyEntry[] => {
+    try {
+        const value = typeof raw === 'string' ? (raw ? JSON.parse(raw) : null) : raw;
+        return Array.isArray(value?.hierarchy) ? value.hierarchy : [];
+    } catch {
+        return [];
+    }
+};
+
+/**
+ * The unit's chain from the country down, as the geo hierarchy widget saves it,
+ * with Master Data's names. A country pack's P-codes nest (a child's code
+ * starts with its parent's), so at each level the unit is the child of the
+ * previous one whose code starts the boundary's P-code; the chain ends at the
+ * unit itself. Ancestors come from Master Data, never from the boundary file,
+ * so a unit moved to a new parent gets the new one.
+ */
+async function masterDataChain(request: Handler, source: Boundaries['geoSource'], pcode: string) {
+    const method = source.method ?? 'POST';
+    const levels = payload(await request(source.service, source.levelsEndpoint, method, { current_page: 1, page_size: 100 }));
+    const chain: HierarchyEntry[] = [];
+    let parentLevel: string | null = null;
+    let parent = '';
+    while (parent !== pcode) {
+        const level = levels.find((item) => (item.parent_level_id ?? null) === parentLevel);
+        if (!level) break;
+        const values = payload(
+            await request(source.service, source.valuesEndpoint, method, {
+                current_page: 1,
+                page_size: 500,
+                level_id: level.level_id,
+                parent_level_value_id: parent,
+            }),
+        );
+        const value = values.find((item) => pcode.startsWith(String(item.level_value_id)));
+        if (!value) break;
+        chain.push({
+            level_id: level.level_id,
+            level: level.level_mnemonic,
+            level_mnemonic: level.level_mnemonic,
+            level_value_id: value.level_value_id,
+            level_value_mnemonic: value.level_value_mnemonic ?? value.level_value_id,
+        });
+        parentLevel = level.level_id;
+        parent = value.level_value_id;
+    }
+    // Only a chain that reached the unit: a partial one would be a guess.
+    return parent === pcode ? chain : [];
+}
+
 async function elevationAt(urlTemplate: string, lat: number, lon: number): Promise<number | null> {
     try {
         const url = urlTemplate.replace('{lat}', String(lat)).replace('{lon}', String(lon));
@@ -78,15 +165,27 @@ async function elevationAt(urlTemplate: string, lat: number, lon: number): Promi
  * at the pin from "elevationUrl" (when configured). The three values can also
  * be typed.
  *
+ * With "bounds" the map stays inside the country. With "boundaries" the pin
+ * also fills the location hierarchy: "url" serves one level's polygons (Master
+ * Data's, seeded from the country pack), the polygon under the pin gives a
+ * P-code, its chain from the country down is read from Master Data, and the
+ * chain is saved where the geo hierarchy widget keeps it. That widget then
+ * shows it and asks only for the levels below (the kebele, which has no
+ * polygons). Where there is no polygon, nothing is filled.
+ *
  * Section metadata:
  *   widget: "oan-geo-point"
- *   widget-data-path: {latitude, longitude, altitude}
+ *   widget-data-path: {latitude, longitude, altitude, hierarchy, location}
+ *     (hierarchy and location: the geo hierarchy widget's own two paths)
  *   widget-data-format: {tileUrl, attribution, center: [lat, lon], zoom, pinZoom,
- *                        maxZoom, height, elevationUrl ("...{lat}...{lon}...")}
+ *                        minZoom, maxZoom, height, elevationUrl ("...{lat}...{lon}..."),
+ *                        bounds: [[south, west], [north, east]],
+ *                        boundaries: {url, pcodeProperty (default "pcode"),
+ *                                     geoSource: {service, method, levelsEndpoint, valuesEndpoint}}}
  */
 export function GeoPointWidget({ config }: { config: Config }) {
     const dispatch = useDispatch();
-    const { t, schemaData } = useWidgetContext();
+    const { t, schemaData, dataSourceRequestHandler } = useWidgetContext();
     const values = useSelector((state: WidgetRootState) => state.widget.values);
     const paths = (config['widget-data-path'] ?? {}) as Record<string, string>;
     const format = { ...DEFAULTS, ...(config['widget-data-format'] ?? {}) };
@@ -111,10 +210,33 @@ export function GeoPointWidget({ config }: { config: Config }) {
 
     const box = useRef<HTMLDivElement>(null);
     const [width, setWidth] = useState(600);
-    const [view, setView] = useState(() => ({
+    const bounds = format.bounds as [[number, number], [number, number]] | undefined;
+    const boundsKey = JSON.stringify(bounds ?? null);
+    const within = useCallback(
+        (point: { lat: number; lon: number }) =>
+            !bounds ||
+            (point.lat >= bounds[0][0] && point.lat <= bounds[1][0] && point.lon >= bounds[0][1] && point.lon <= bounds[1][1]),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [boundsKey],
+    );
+    // The centre stays inside the bounds, so the map cannot be panned away.
+    type View = { center: { lat: number; lon: number }; zoom: number };
+    const fit = useCallback(
+        (v: View): View =>
+            bounds
+                ? { ...v, center: { lat: clamp(v.center.lat, bounds[0][0], bounds[1][0]), lon: clamp(v.center.lon, bounds[0][1], bounds[1][1]) } }
+                : v,
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [boundsKey],
+    );
+    const [view, setRawView] = useState<View>(() => ({
         center: pinned ? { lat: lat!, lon: lon! } : { lat: format.center[0], lon: format.center[1] },
         zoom: pinned ? format.pinZoom : format.zoom,
     }));
+    const setView = useCallback(
+        (next: View | ((v: View) => View)) => setRawView((v) => fit(typeof next === 'function' ? next(v) : next)),
+        [fit],
+    );
     const [status, setStatus] = useState<string | null>(null);
 
     // Centre on a stored pin once it arrives (the record loads after mount).
@@ -152,15 +274,62 @@ export function GeoPointWidget({ config }: { config: Config }) {
         [base, dispatch, paths],
     );
 
+    // The location hierarchy under the pin, saved for the geo hierarchy widget.
+    const boundaries = format.boundaries as Boundaries | undefined;
+    const fillLocation = useCallback(
+        async (point: { lat: number; lon: number }) => {
+            if (!boundaries?.url || !paths.hierarchy || !dataSourceRequestHandler) return;
+            try {
+                const unit = unitAt(await loadBoundaries(boundaries.url), point.lat, point.lon);
+                // A unit without a polygon (a woreda created since the boundaries were cut).
+                if (!unit) {
+                    setStatus(label('oan_map_no_boundaries'));
+                    return;
+                }
+                const pcode = String(unit.properties[boundaries.pcodeProperty ?? 'pcode'] ?? '');
+                const chain = pcode
+                    ? await masterDataChain(dataSourceRequestHandler as Handler, boundaries.geoSource, pcode)
+                    : [];
+                const last = chain[chain.length - 1];
+                if (!last) {
+                    setStatus(label('oan_map_no_boundaries'));
+                    return;
+                }
+                setStatus(chain.slice(1).map((entry) => entry.level_value_mnemonic).join(' / '));
+                const raw = getValueByPath(values, paths.hierarchy) ?? getValueByPath(schemaData ?? {}, paths.hierarchy);
+                // The same unit as before: keep what was chosen below it.
+                if (parseHierarchy(raw).some((entry) => entry.level_value_id === last.level_value_id)) return;
+                const document = { hierarchy: chain, lowest_level_value_id: last.level_value_id };
+                let patch: Record<string, unknown> = setValueByPath(
+                    {},
+                    paths.hierarchy,
+                    typeof raw === 'string' ? JSON.stringify(document) : document,
+                );
+                // The levels below are still to be chosen.
+                if (paths.location) patch = setValueByPath(patch, paths.location, null);
+                dispatch(setValues(patch as never));
+            } catch {
+                setStatus(label('oan_map_no_boundaries'));
+            }
+        },
+        [boundaries, dataSourceRequestHandler, dispatch, label, paths.hierarchy, paths.location, schemaData, values],
+    );
+
     const pin = useCallback(
         async (point: { lat: number; lon: number }, altitude: number | null = null) => {
+            if (!within(point)) {
+                setStatus(label('oan_map_outside'));
+                return;
+            }
+            setStatus(null);
             write({ latitude: round(point.lat, 7), longitude: round(point.lon, 7), ...(altitude !== null ? { altitude: round(altitude, 1) } : {}) });
+            void fillLocation(point);
             if (altitude === null && format.elevationUrl) {
                 const elevation = await elevationAt(String(format.elevationUrl), point.lat, point.lon);
                 if (elevation !== null) write({ altitude: round(elevation, 1) });
             }
         },
-        [format.elevationUrl, write],
+        [fillLocation, format.elevationUrl, label, within, write],
     );
 
     // Drag to pan; a press that does not move places the pin.
@@ -203,7 +372,7 @@ export function GeoPointWidget({ config }: { config: Config }) {
             });
         },
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [width, height, format.minZoom, format.maxZoom],
+        [width, height, format.minZoom, format.maxZoom, setView],
     );
     useEffect(() => {
         const element = box.current;
@@ -245,7 +414,6 @@ export function GeoPointWidget({ config }: { config: Config }) {
         setStatus(label('oan_map_locating'));
         navigator.geolocation.getCurrentPosition(
             ({ coords }) => {
-                setStatus(null);
                 setView({ center: { lat: coords.latitude, lon: coords.longitude }, zoom: Number(format.pinZoom) });
                 void pin({ lat: coords.latitude, lon: coords.longitude }, coords.altitude ?? null);
             },

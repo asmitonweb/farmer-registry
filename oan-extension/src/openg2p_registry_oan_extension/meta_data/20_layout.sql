@@ -18,7 +18,8 @@ WITH replaced (upstream_section_id, oan_section_id) AS (
          ('farmer_household_lookup_section_01', 'oan_farmer_household_lookup'),
          ('farmer_crop_crop_details_section_01', 'oan_farmer_crops'),
          ('farmer_farmer_location_section_03', 'oan_farmer_location'),
-         ('household_household_household_information_section_01', 'oan_household_information')
+         ('household_household_household_information_section_01', 'oan_household_information'),
+         ('bc882922-9008-4902-8f4f-98db0fa8f9ad', 'oan_farmer_documents')
 )
 INSERT INTO "public"."g2p_register_ui_tab_sections" ("tab_section_id", "register_id", "tab_id", "section_id", "section_order")
 SELECT 'oan_' || t.tab_section_id, t.register_id, t.tab_id, r.oan_section_id, t.section_order
@@ -39,7 +40,8 @@ WITH replaced (upstream_section_id, oan_section_id) AS (
          ('farmer_farm_input_farm_input_details_intake_section_01', 'oan_farmer_farm_inputs_intake'),
          ('farmer_crop_crop_details_intake_section_01', 'oan_farmer_crops_intake'),
          ('farmer_farmer_location_section_03', 'oan_farmer_location'),
-         ('household_household_household_information_section_01', 'oan_household_information')
+         ('household_household_household_information_section_01', 'oan_household_information'),
+         ('bc882922-9008-4902-8f4f-98db0fa8f9ad', 'oan_farmer_documents')
 )
 INSERT INTO "public"."g2p_intake_form_ui_tab_sections" ("tab_section_id", "tab_id", "section_id", "section_order")
 SELECT 'oan_' || t.tab_section_id, t.tab_id, r.oan_section_id, t.section_order
@@ -95,7 +97,8 @@ WHERE "tab_section_id" IN (
   'f1a2b3c4-d5e6-4789-a012-3456789abcde',  -- household link tab: household lookup
   'a163b218-32d6-49a7-99b6-05d4aeb31f0d',  -- crops tab
   'd8753df5-d511-4c63-b045-ff9720a31808',  -- farmer tab: location
-  '6a759aa9-b1cb-47c6-a1ed-db0b3d022f1d'   -- household tab: household information
+  '6a759aa9-b1cb-47c6-a1ed-db0b3d022f1d',  -- household tab: household information
+  '858fead4-9d8b-4f76-9915-7d591b1f4559'   -- farmer tab: documents
 )
 AND EXISTS (SELECT 1 FROM "public"."g2p_register_ui_tab_sections" o
             WHERE o."tab_section_id" = 'oan_' || "g2p_register_ui_tab_sections"."tab_section_id");
@@ -110,7 +113,8 @@ WHERE "tab_section_id" IN (
   'tab_section_9',                         -- membership
   'tab_section_5',                         -- location
   'e0506ad7-657c-4f5d-807e-3ad430dcb639',  -- crops
-  'hh_tab_section_1'                       -- household form: household information
+  'hh_tab_section_1',                      -- household form: household information
+  'd6873c11-1f86-45f5-9fef-9ad6c8c22303'   -- documents
 )
 AND EXISTS (SELECT 1 FROM "public"."g2p_intake_form_ui_tab_sections" o
             WHERE o."tab_section_id" = 'oan_' || "g2p_intake_form_ui_tab_sections"."tab_section_id");

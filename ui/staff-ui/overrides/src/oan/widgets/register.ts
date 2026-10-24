@@ -1,7 +1,8 @@
 import { createElement } from 'react';
-import { HeaderSectionWidget, widgetRegistry } from '@openg2p/registry-widgets';
+import { FileInputWidget, HeaderSectionWidget, widgetRegistry } from '@openg2p/registry-widgets';
+import { DOCUMENT_SLOT_VARIANT, DOCUMENTS_VARIANT, DocumentsWidget } from './DocumentsWidget';
 import { EnumeratorPositionWidget } from './EnumeratorPositionWidget';
-import { EthiopicDateWidget } from './EthiopicDateWidget';
+import { FileCellWidget } from './FileCellWidget';
 import { FARMER_PHOTO_VARIANT, FarmerPhotoWidget } from './FarmerPhotoWidget';
 import { GeoPointWidget } from './GeoPointWidget';
 
@@ -21,9 +22,23 @@ function HeaderSectionOrVariant(props: Props) {
 
 widgetRegistry.register({ widget: 'header-section', component: HeaderSectionOrVariant });
 
+// The same for documents: the package saves a section's files only from
+// widgets of type "file" (sectionFiles.ts), one file per widget. A documents
+// category is several "file" widgets; the first shows the category's files and
+// the others render nothing. Every other file widget is upstream's.
+function FileOrVariant(props: Props) {
+    const variant = props.config['widget-variant'];
+    if (variant === DOCUMENTS_VARIANT) return createElement(DocumentsWidget, props as never);
+    if (variant === DOCUMENT_SLOT_VARIANT) return null;
+    return createElement(FileInputWidget, props as never);
+}
+
+widgetRegistry.register({ widget: 'file', component: FileOrVariant });
+
 // OAN's own widget types. A widget with an object "widget-data-path" saves
 // every field it names (sectionSnapshot.ts), so each of these saves its pair
-// or set of fields with the section.
-widgetRegistry.register({ widget: 'oan-ethiopic-date', component: EthiopicDateWidget as never });
+// or set of fields with the section. A table cell widget gets the cell value
+// and onChange from the table.
+widgetRegistry.register({ widget: 'oan-file-cell', component: FileCellWidget as never });
 widgetRegistry.register({ widget: 'oan-geo-point', component: GeoPointWidget as never });
 widgetRegistry.register({ widget: 'oan-enumerator-position', component: EnumeratorPositionWidget as never });

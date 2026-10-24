@@ -11,12 +11,7 @@ This module has no database or framework imports, so it can be tested alone.
 from collections.abc import Iterable
 from datetime import date, datetime
 
-from .ethiopian_calendar import (
-    ethiopic_to_gregorian,
-    format_ethiopic,
-    gregorian_to_ethiopic_string,
-    parse_ethiopic,
-)
+from .ethiopian_calendar import gregorian_to_ethiopic_string
 
 UNIT_TO_HECTARES = {
     "HECTARE": 1.0,
@@ -29,10 +24,6 @@ UNIT_TO_HECTARES = {
 
 # geo_code_hierarchy_json level -> farmer column holding that level's name
 GEO_NAME_FIELDS = {"region": "region_name", "zone": "zone_name", "woreda": "woreda_name", "kebele": "kebele_name"}
-
-
-class DerivationError(ValueError):
-    """An entered value the derivation cannot use; the message is for the user."""
 
 
 def _number(value) -> float | None:
@@ -111,37 +102,17 @@ def geo_names(hierarchy) -> dict:
     return names
 
 
-def sync_ethiopic(record: dict, gc_field: str, ec_field: str) -> None:
-    """Keep a Gregorian date and its Ethiopian calendar twin in step.
+def ethiopic_twin(record: dict, gc_field: str, ec_field: str) -> None:
+    """Set a date's Ethiopian calendar twin from the Gregorian date.
 
-    The Gregorian date is the one stored and compared (the OpenG2P approach to
-    the Ethiopian calendar); the Ethiopian one is derived from it. Only when no
-    Gregorian date was given is it taken from the Ethiopian one. A record that
-    carries neither field is left alone, so a partial update derives nothing.
+    Dates are entered and stored in the Gregorian calendar with the registry's
+    date widget, as OpenG2P does (its ODK forms show Ethiopian dates and still
+    record the Gregorian one). The Ethiopian date is only derived, for lists,
+    reports and the previous registry's data. A record without the Gregorian
+    field, such as a partial update, is left alone.
     """
-    if gc_field not in record and ec_field not in record:
-        return
-    gregorian = _date(record.get(gc_field))
-    if gregorian is not None:
-        record[ec_field] = gregorian_to_ethiopic_string(gregorian)
-        return
-    raw = record.get(ec_field)
-    if raw in (None, ""):
-        for field in (gc_field, ec_field):
-            if field in record:
-                record[field] = None
-        return
-    ethiopic = parse_ethiopic(raw)
-    if ethiopic is None:
-        raise DerivationError(f"{ec_field} must be an Ethiopian date written as YYYY-MM-DD")
-    try:
-        record[gc_field] = ethiopic_to_gregorian(*ethiopic).isoformat()
-    except ValueError:
-        raise DerivationError(
-            f"{ec_field} {format_ethiopic(*ethiopic)} is not an Ethiopian date "
-            "(months 1-12 have 30 days, Pagumen 5 or 6)"
-        ) from None
-    record[ec_field] = format_ethiopic(*ethiopic)
+    if gc_field in record:
+        record[ec_field] = ethiopic_of(record.get(gc_field))
 
 
 def ethiopic_of(value) -> str | None:
