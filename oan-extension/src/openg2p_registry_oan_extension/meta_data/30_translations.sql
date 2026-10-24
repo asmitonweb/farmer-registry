@@ -18,6 +18,7 @@ WITH oan (language_code, labels) AS (
     "grandfathers_name_other": "Grandfather''s Name (Primary Language)",
     "primary_language": "Primary Language",
     "birth_date_ec": "Birth Date (Ethiopian)",
+    "household_lookup_helptext": "Pick the household if it is already registered. For a new household, leave this empty and fill in Household Information and Household Members below.",
     "farmer_photo": "Farmer Photo",
     "oan_photo_upload": "Upload photo",
     "oan_photo_replace": "Replace photo",

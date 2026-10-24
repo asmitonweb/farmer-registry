@@ -52,6 +52,21 @@ async def _load() -> tuple[Rules, dict[str, str], dict[str, str]]:
     return _cache["rules"], _cache["registers"], _cache["messages"]
 
 
+class _reworded:
+    """Rewords a validation message raised inside it (upstream_messages)."""
+
+    def __init__(self, messages: dict[str, str]):
+        self.messages = messages
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, kind, error, trace):
+        if isinstance(error, G2PRegistryException) and error.message                 and error.code == G2PRegistryErrorCodes.REQUEST_VALIDATION_ERROR.value[1]:
+            validation_error(reword(error.message, self.messages))
+        return False
+
+
 class WidgetRuleValidation:
     """Adds the derived values and the section widgets' value rules to a
     register's domain checks: derive first, so the farmer checks see them.
@@ -65,12 +80,8 @@ class WidgetRuleValidation:
         if type(self)._derive_first:
             await self.derive(records)
         if type(self)._upstream_validates:
-            try:
+            async with _reworded(messages):
                 await super().validate_domain_attributes(records)
-            except G2PRegistryException as error:
-                if error.code != G2PRegistryErrorCodes.REQUEST_VALIDATION_ERROR.value[1] or not error.message:
-                    raise
-                validation_error(reword(error.message, messages))
         field_rules = rules.get(registers.get(self.register_mnemonic()), {})
         if not field_rules:
             return
@@ -79,6 +90,12 @@ class WidgetRuleValidation:
         problems = [p for record in records for p in check_record(record, field_rules, messages)]
         if problems:
             validation_error("; ".join(dict.fromkeys(problems)))
+
+    async def validate_intake_parent_link(self, record, link_internal_record_id, session):
+        # Upstream's roster checks (the members against the household) run here.
+        _, _, messages = await _load()
+        async with _reworded(messages):
+            await super().validate_intake_parent_link(record, link_internal_record_id, session)
 
 
 _PREFIX = "G2PRegisterDomainService"

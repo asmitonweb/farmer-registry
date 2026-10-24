@@ -194,3 +194,17 @@ ON CONFLICT ("section_id") DO UPDATE SET
   "register_id" = EXCLUDED."register_id", "section_register_id" = EXCLUDED."section_register_id",
   "section_mnemonic" = EXCLUDED."section_mnemonic", "section_description" = EXCLUDED."section_description",
   "section_ui_schema" = EXCLUDED."section_ui_schema";
+
+-- The household of a new farmer is either one already registered, picked in
+-- the household lookup, or a new one, entered in the household sections of
+-- the farmer intake form (20_layout.sql). Upstream requires the lookup, which
+-- would make a new household impossible to enter, so OAN's copy of the lookup
+-- is optional and says which to do.
+UPDATE "public"."g2p_register_sections" s
+SET "section_ui_schema" = jsonb_set(s."section_ui_schema", '{panels,0,panels,0,widgets}', (
+  SELECT jsonb_agg(CASE WHEN w ->> 'widget-id' = 'household_lookup'
+                        THEN w || '{"widget-required": false, "widget-data-helptext": "household_lookup_helptext"}'::jsonb
+                        ELSE w END ORDER BY i)
+  FROM jsonb_array_elements(s."section_ui_schema" #> '{panels,0,panels,0,widgets}') WITH ORDINALITY x(w, i)))
+WHERE s."section_id" = 'oan_farmer_household_lookup'
+  AND jsonb_typeof(s."section_ui_schema" #> '{panels,0,panels,0,widgets}') = 'array';

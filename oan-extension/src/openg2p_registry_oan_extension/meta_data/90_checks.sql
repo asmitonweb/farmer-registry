@@ -110,4 +110,12 @@ BEGIN
   IF missing IS NOT NULL THEN
     RAISE EXCEPTION 'Household sections not on the farmer intake form: %', missing;
   END IF;
+
+  -- A new household can be entered, so the household lookup is optional (10_sections.sql).
+  IF EXISTS (SELECT 1 FROM "public"."g2p_register_sections" s,
+                  jsonb_array_elements(s."section_ui_schema" #> '{panels,0,panels,0,widgets}') w
+             WHERE s."section_id" = 'oan_farmer_household_lookup'
+               AND w ->> 'widget-id' = 'household_lookup' AND (w ->> 'widget-required')::boolean IS TRUE) THEN
+    RAISE EXCEPTION 'The household lookup on the farmer form is still required';
+  END IF;
 END $$;
