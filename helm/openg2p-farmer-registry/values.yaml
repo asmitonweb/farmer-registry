@@ -119,6 +119,7 @@ registry:
     # worker's own config class, so they take the REGISTRY_CELERY_WORKERS_
     # prefix; REGISTRY_CORE_AWE_* is silently ignored there and AWE stays off.
     envVars:
+      REGISTRY_CELERY_WORKERS_IMPORT_FILE_SENDER_ID: farmer-partner
       REGISTRY_CELERY_WORKERS_AWE_ENABLED: '{{ .Values.global.aweEnabled }}'
       # In-cluster, like db-seed's AWE wait: the ingress URL (global.aweBaseUrl)
       # is signed by a private CA on far that the worker does not carry.

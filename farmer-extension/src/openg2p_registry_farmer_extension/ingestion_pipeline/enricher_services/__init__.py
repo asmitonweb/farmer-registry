@@ -20,3 +20,4 @@ from .g2p_household_member_enricher_services import (
     G2PUndpHouseholdMemberUpdateEnricherService,
     G2PUndpHouseholdMemberDeleteEnricherService
 )
+from .g2p_farmer_file_enricher_service import G2PFarmerFileImportEnricherService
