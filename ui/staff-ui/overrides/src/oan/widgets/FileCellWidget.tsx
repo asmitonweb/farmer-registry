@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { isStoredDocumentRef, useWidgetContext } from '@openg2p/registry-widgets';
-import { isSerializedFile, serializeFile } from './files';
+import { accepts, acceptedTypes, isSerializedFile, serializeFile } from './files';
 
 type Config = Record<string, any>;
 
@@ -19,7 +19,8 @@ const LABELS: Record<string, string> = {
     oan_file_upload: 'Upload',
     oan_file_replace: 'Replace',
     oan_file_remove: 'Remove',
-    oan_file_too_large: 'The file is larger than {size} MB.',
+    oan_file_too_large: 'The file is larger than {size} MB. Choose a smaller file, or scan it again at a lower resolution.',
+    oan_file_bad_type: '{name} cannot be attached here. Choose a {types} file.',
 };
 
 /**
@@ -66,6 +67,10 @@ export function FileCellWidget({ config, value, onChange, onBlur, isEnabled = tr
     const pick = async (file: File | undefined) => {
         if (!file) return;
         setError(null);
+        if (!accepts(file, accept)) {
+            setError(label('oan_file_bad_type', { name: file.name, types: acceptedTypes(accept) }));
+            return;
+        }
         if (maxSize && file.size > maxSize) {
             setError(label('oan_file_too_large', { size: Math.round(maxSize / 1048576) }));
             return;

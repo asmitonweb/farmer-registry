@@ -9,7 +9,11 @@
 -- column_span widens a column: the location map takes two.
 --
 -- Dates are upstream's date widget, entered in the Gregorian calendar; the
--- Ethiopian calendar twins are derived by the domain services.
+-- Ethiopian calendar twins are derived by the domain services, and the birth
+-- date's is shown read-only next to it (oan-ethiopian-date).
+--
+-- Yes/no questions are answered yes or no: "allowUnset": false drops the
+-- radio's "Not set" choice. An unanswered question stays empty.
 
 -- Documents: six categories, each with the kind of document and up to
 -- `slots` files. Only the identity document is required.
@@ -90,7 +94,13 @@ form_layout (oan_section_id, upstream_section_id, col, ord, w) AS (
    '{"widget-id": "last_name", "widget-label": "grandfathers_name_eng"}'),
   ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 4, '{"widget-id": "gender"}'),
   ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 5, '{"widget-id": "birth_date"}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 6, '{"widget-id": "estimated_age"}'),
+  -- The birth date in the Ethiopian calendar, shown as it is entered; the
+  -- stored twin (birth_date_ec) is derived by the server.
+  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 6,
+   '{"widget": "oan-ethiopian-date", "widget-id": "birth_date_ec", "widget-type": "input", "widget-label": "birth_date_ec",
+     "widget-readonly": true, "widget-required": false,
+     "widget-data-options": {"source": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.birth_date"}}'),
+  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 7, '{"widget-id": "estimated_age", "widget-data-format": {"allowSigned": false, "numericType": "integer"}}'),
   ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 2, 1,
    '{"widget": "text", "widget-id": "first_name_amh", "widget-type": "input", "widget-label": "first_name_amh",
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.first_name_amh",
@@ -136,7 +146,7 @@ form_layout (oan_section_id, upstream_section_id, col, ord, w) AS (
    '{"widget": "boolean", "widget-id": "has_national_id", "widget-type": "input", "widget-label": "has_national_id",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.has_national_id",
-     "widget-data-format": {"allowUnset": true, "booleanControlType": "radio", "booleanRepresentation": "yes-no"}}'),
+     "widget-data-format": {"allowUnset": false, "booleanControlType": "radio", "booleanRepresentation": "yes-no"}}'),
   ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 3, 4,
    '{"widget": "text", "widget-id": "foundational_id", "widget-type": "input", "widget-label": "fayda_fin",
      "widget-readonly": false, "widget-required": false,
@@ -175,12 +185,12 @@ form_layout (oan_section_id, upstream_section_id, col, ord, w) AS (
    '{"widget": "boolean", "widget-id": "is_psnp_user", "widget-type": "input", "widget-label": "is_psnp_user",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.is_psnp_user",
-     "widget-data-format": {"allowUnset": true, "booleanControlType": "radio", "booleanRepresentation": "yes-no"}}'),
+     "widget-data-format": {"allowUnset": false, "booleanControlType": "radio", "booleanRepresentation": "yes-no"}}'),
   ('oan_farmer_socio_economic_and_health', 'farmer_farmer_socio_economic_and_health_section_04', 3, 1,
    '{"widget": "boolean", "widget-id": "is_farmer", "widget-type": "input", "widget-label": "is_farmer",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.is_farmer",
-     "widget-data-format": {"allowUnset": true, "booleanControlType": "radio", "booleanRepresentation": "yes-no"}}'),
+     "widget-data-format": {"allowUnset": false, "booleanControlType": "radio", "booleanRepresentation": "yes-no"}}'),
   ('oan_farmer_socio_economic_and_health', 'farmer_farmer_socio_economic_and_health_section_04', 3, 2,
    '{"widget": "select", "widget-id": "farming_type", "widget-type": "input", "widget-label": "farming_type",
      "widget-readonly": false, "widget-required": false,
@@ -216,17 +226,17 @@ form_layout (oan_section_id, upstream_section_id, col, ord, w) AS (
    '{"widget": "boolean", "widget-id": "other_farmer_in_household", "widget-type": "input", "widget-label": "other_farmer_in_household",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "9055ab43-c85d-4833-bd00-ca657bb72644.other_farmer_in_household",
-     "widget-data-format": {"allowUnset": true, "booleanControlType": "radio", "booleanRepresentation": "yes-no"}}'),
+     "widget-data-format": {"allowUnset": false, "booleanControlType": "radio", "booleanRepresentation": "yes-no"}}'),
   ('oan_household_information', 'household_household_household_information_section_01', 3, 3,
    '{"widget": "boolean", "widget-id": "father_included", "widget-type": "input", "widget-label": "father_included",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "9055ab43-c85d-4833-bd00-ca657bb72644.father_included",
-     "widget-data-format": {"allowUnset": true, "booleanControlType": "radio", "booleanRepresentation": "yes-no"}}'),
+     "widget-data-format": {"allowUnset": false, "booleanControlType": "radio", "booleanRepresentation": "yes-no"}}'),
   ('oan_household_information', 'household_household_household_information_section_01', 3, 4,
    '{"widget": "boolean", "widget-id": "mother_included", "widget-type": "input", "widget-label": "mother_included",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "9055ab43-c85d-4833-bd00-ca657bb72644.mother_included",
-     "widget-data-format": {"allowUnset": true, "booleanControlType": "radio", "booleanRepresentation": "yes-no"}}'),
+     "widget-data-format": {"allowUnset": false, "booleanControlType": "radio", "booleanRepresentation": "yes-no"}}'),
 
   -- Location: the map across the first two columns, the location and the
   -- address in the third. The map pins where the farmer lives: OpenStreetMap
@@ -247,7 +257,7 @@ form_layout (oan_section_id, upstream_section_id, col, ord, w) AS (
   ('oan_farmer_location', 'farmer_farmer_location_section_03', 2, 2, '{"widget-id": "address_line_1"}'),
   ('oan_farmer_location', 'farmer_farmer_location_section_03', 2, 3, '{"widget-id": "address_line_2"}'),
   ('oan_farmer_location', 'farmer_farmer_location_section_03', 2, 4, '{"widget-id": "postal_code"}'),
-  ('oan_farmer_location', 'farmer_farmer_location_section_03', 2, 5, '{"widget-id": "country_code"}'),
+  ('oan_farmer_location', 'farmer_farmer_location_section_03', 2, 5, '{"widget-id": "country_code", "widget-data-default": "ET", "widget-data-validation": {"pattern": "^[A-Z]{2}$", "minLength": 2, "maxLength": 2, "patternMessage": "country_code_format"}}'),
   -- A second, local or community language.
   ('oan_farmer_location', 'farmer_farmer_location_section_03', 2, 6,
    '{"widget": "select", "widget-id": "local_language", "widget-type": "input", "widget-label": "local_language",
