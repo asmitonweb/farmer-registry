@@ -12,6 +12,7 @@ from ..models.enums import (
     EducationalLevelEnum,
     SourceOfIncomeEnum,
 )
+from .oan import OANSchemaFarmer  # OAN columns, see oan.py
 
 class G2PSchemaFarmer:
     
@@ -26,7 +27,7 @@ class G2PSchemaFarmer:
     education_level: Optional[EducationalLevelEnum] = None
     national_id_masked: Optional[str] = None
 
-class G2PRegisterSchemaFarmer(G2PRegisterBaseSchema, G2PPersonSchema, G2PGeoSchema, G2PAddressLinesSchema, G2PSchemaFarmer):
+class G2PRegisterSchemaFarmer(G2PRegisterBaseSchema, G2PPersonSchema, G2PGeoSchema, G2PAddressLinesSchema, G2PSchemaFarmer, OANSchemaFarmer):
     """
     Schema for Farmer register.
     Inherits fields from G2PRegisterBaseSchema, G2PPersonSchema, and G2PGeoSchema.
@@ -41,7 +42,7 @@ class G2PRegisterHistorySchemaFarmer(G2PRegisterHistorySchema, G2PPersonHistoryS
     Attributes specific to the Farmer domain are not included in the history schema as they are not expected to change over time.
     """
 
-class G2PIntakeFormSchemaFarmer(G2PIntakeFormSchemaBase, G2PRegisterBaseSchema, G2PPersonSchema, G2PGeoSchema, G2PAddressLinesSchema, G2PSchemaFarmer):
+class G2PIntakeFormSchemaFarmer(G2PIntakeFormSchemaBase, G2PRegisterBaseSchema, G2PPersonSchema, G2PGeoSchema, G2PAddressLinesSchema, G2PSchemaFarmer, OANSchemaFarmer):
     """
     Schema for Farmer intake form.
     Inherits fields from G2PRegisterBaseSchema, G2PPersonSchema, and G2PGeoSchema.

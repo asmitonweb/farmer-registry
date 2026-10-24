@@ -4,6 +4,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from openg2p_registry_core.models import G2PRegister, G2PRegisterHistory
 from ..services import G2PRegisterDomainServiceMembershipDetails
 from .enums import FarmerClusterRoleEnum
+from .oan import OANMembershipDetails  # OAN columns, see oan.py
 
 
 class G2PMembershipDetails:
@@ -17,7 +18,7 @@ class G2PMembershipDetails:
 
 
 # All Register classes should have the prefix G2PRegister
-class G2PRegisterMembershipDetails(G2PRegister, G2PMembershipDetails):
+class G2PRegisterMembershipDetails(G2PRegister, G2PMembershipDetails, OANMembershipDetails):
     __tablename__ = "g2p_register_membership_details"
 
     def get_search_text_fields(self) -> str:
@@ -30,11 +31,11 @@ class G2PRegisterMembershipDetails(G2PRegister, G2PMembershipDetails):
 
 
 # All Register History classes should have the prefix G2PRegisterHistory
-class G2PRegisterHistoryMembershipDetails(G2PRegisterHistory, G2PMembershipDetails):
+class G2PRegisterHistoryMembershipDetails(G2PRegisterHistory, G2PMembershipDetails, OANMembershipDetails):
     __tablename__ = "g2p_register_history_membership_details"
 
 # All Intake Form classes should have the prefix G2PIntakeForm
-class G2PIntakeFormMembershipDetails(G2PIntakeForm, G2PRegister, G2PMembershipDetails):
+class G2PIntakeFormMembershipDetails(G2PIntakeForm, G2PRegister, G2PMembershipDetails, OANMembershipDetails):
     __tablename__ = "g2p_intake_form_membership_details"
 
     async def get_link_internal_record_id(self, session):

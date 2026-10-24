@@ -7,6 +7,7 @@ from openg2p_registry_core.models import (
 )
 from .enums import LandOwnershipTypeEnum, LandSizeUnitEnum, CurrentLandUseEnum, FarmingTypeEnum
 from ..services import G2PRegisterDomainServiceLand
+from .oan import OANLand  # OAN columns, see oan.py
 
 class G2PLand:
 
@@ -22,7 +23,7 @@ class G2PLand:
 
 
 # All Register classes should have the prefix G2PRegister
-class G2PRegisterLand(G2PRegister, G2PGeo, G2PGeoShape, G2PLand):
+class G2PRegisterLand(G2PRegister, G2PGeo, G2PGeoShape, G2PLand, OANLand):
     __tablename__ = "g2p_register_lands"
 
     def get_search_text_fields(self) -> str:
@@ -34,11 +35,11 @@ class G2PRegisterLand(G2PRegister, G2PGeo, G2PGeoShape, G2PLand):
         return G2PRegisterDomainServiceLand().construct_record_name(self.to_dict())
 
 # All Register History classes should have the prefix G2PRegisterHistory
-class G2PRegisterHistoryLand(G2PRegisterHistory, G2PGeoHistory, G2PGeoShapeHistory, G2PLand):
+class G2PRegisterHistoryLand(G2PRegisterHistory, G2PGeoHistory, G2PGeoShapeHistory, G2PLand, OANLand):
     __tablename__ = "g2p_register_history_lands"
 
 # All Intake Form classes should have the prefix G2PIntakeForm
-class G2PIntakeFormLand(G2PIntakeForm, G2PRegister, G2PGeo, G2PGeoShape, G2PLand):
+class G2PIntakeFormLand(G2PIntakeForm, G2PRegister, G2PGeo, G2PGeoShape, G2PLand, OANLand):
     __tablename__ = "g2p_intake_form_lands"
 
     async def get_link_internal_record_id(self, session):

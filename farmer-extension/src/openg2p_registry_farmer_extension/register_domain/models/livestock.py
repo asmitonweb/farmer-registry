@@ -4,6 +4,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from openg2p_registry_core.models import G2PRegister, G2PRegisterHistory
 from ..services import G2PRegisterDomainServiceLivestock
 from .enums import LivestockSystemEnum
+from .oan import OANLivestock  # OAN columns, see oan.py
 
 
 class G2PLivestock:
@@ -15,7 +16,7 @@ class G2PLivestock:
 
 
 # All Register classes should have the prefix G2PRegister
-class G2PRegisterLivestock(G2PRegister, G2PLivestock):
+class G2PRegisterLivestock(G2PRegister, G2PLivestock, OANLivestock):
     __tablename__ = "g2p_register_livestocks"
 
     def get_search_text_fields(self) -> str:
@@ -28,11 +29,11 @@ class G2PRegisterLivestock(G2PRegister, G2PLivestock):
 
 
 # All Register History classes should have the prefix G2PRegisterHistory
-class G2PRegisterHistoryLivestock(G2PRegisterHistory, G2PLivestock):
+class G2PRegisterHistoryLivestock(G2PRegisterHistory, G2PLivestock, OANLivestock):
     __tablename__ = "g2p_register_history_livestocks"
 
 # All Intake Form classes should have the prefix G2PIntakeForm
-class G2PIntakeFormLivestock(G2PIntakeForm, G2PRegister, G2PLivestock):
+class G2PIntakeFormLivestock(G2PIntakeForm, G2PRegister, G2PLivestock, OANLivestock):
     __tablename__ = "g2p_intake_form_livestocks"
 
     async def get_link_internal_record_id(self, session):

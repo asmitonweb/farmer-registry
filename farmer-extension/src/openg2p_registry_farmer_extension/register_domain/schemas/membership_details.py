@@ -2,6 +2,7 @@ from typing import Optional
 
 from openg2p_registry_core.schemas import G2PRegisterBaseSchema, G2PRegisterHistorySchema, G2PIntakeFormSchemaBase
 from ..models.enums import FarmerClusterRoleEnum
+from .oan import OANSchemaMembershipDetails  # OAN columns, see oan.py
 
 
 class G2PSchemaMembershipDetails:
@@ -14,7 +15,7 @@ class G2PSchemaMembershipDetails:
     farmer_cluster_role: Optional[FarmerClusterRoleEnum] = None
 
 
-class G2PRegisterSchemaMembershipDetails(G2PRegisterBaseSchema, G2PSchemaMembershipDetails):
+class G2PRegisterSchemaMembershipDetails(G2PRegisterBaseSchema, G2PSchemaMembershipDetails, OANSchemaMembershipDetails):
     """
     Schema for Membership Details register.
     Inherits fields from G2PRegisterBaseSchema.
@@ -29,7 +30,7 @@ class G2PRegisterHistorySchemaMembershipDetails(G2PRegisterHistorySchema):
     """
 
 
-class G2PIntakeFormSchemaMembershipDetails(G2PIntakeFormSchemaBase, G2PRegisterBaseSchema, G2PSchemaMembershipDetails):
+class G2PIntakeFormSchemaMembershipDetails(G2PIntakeFormSchemaBase, G2PRegisterBaseSchema, G2PSchemaMembershipDetails, OANSchemaMembershipDetails):
     """
     Schema for Membership Details intake form.
     Inherits fields from G2PRegisterBaseSchema.

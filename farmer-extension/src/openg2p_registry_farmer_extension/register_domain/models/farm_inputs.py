@@ -3,6 +3,7 @@ from sqlalchemy import Boolean, String, select
 from sqlalchemy.orm import Mapped, mapped_column
 from openg2p_registry_core.models import G2PRegister, G2PRegisterHistory
 from ..services import G2PRegisterDomainServiceFarmInputs
+from .oan import OANFarmInputs  # OAN columns, see oan.py
 
 
 class G2PFarmInputs:
@@ -17,7 +18,7 @@ class G2PFarmInputs:
 
 
 # All Register classes should have the prefix G2PRegister
-class G2PRegisterFarmInputs(G2PRegister, G2PFarmInputs):
+class G2PRegisterFarmInputs(G2PRegister, G2PFarmInputs, OANFarmInputs):
     __tablename__ = "g2p_register_farm_inputs"
 
     def get_search_text_fields(self) -> str:
@@ -30,11 +31,11 @@ class G2PRegisterFarmInputs(G2PRegister, G2PFarmInputs):
 
 
 # All Register History classes should have the prefix G2PRegisterHistory
-class G2PRegisterHistoryFarmInputs(G2PRegisterHistory, G2PFarmInputs):
+class G2PRegisterHistoryFarmInputs(G2PRegisterHistory, G2PFarmInputs, OANFarmInputs):
     __tablename__ = "g2p_register_history_farm_inputs"
 
 # All Intake Form classes should have the prefix G2PIntakeForm
-class G2PIntakeFormFarmInputs(G2PIntakeForm, G2PRegister, G2PFarmInputs):
+class G2PIntakeFormFarmInputs(G2PIntakeForm, G2PRegister, G2PFarmInputs, OANFarmInputs):
     __tablename__ = "g2p_intake_form_farm_inputs"
 
     async def get_link_internal_record_id(self, session):

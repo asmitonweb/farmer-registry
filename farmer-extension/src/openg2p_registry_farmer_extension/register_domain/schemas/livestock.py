@@ -2,6 +2,7 @@ from typing import Optional
 
 from openg2p_registry_core.schemas import G2PRegisterBaseSchema, G2PRegisterHistorySchema, G2PIntakeFormSchemaBase
 from ..models.enums import LivestockSystemEnum
+from .oan import OANSchemaLivestock  # OAN columns, see oan.py
 
 
 class G2PSchemaLivestock:
@@ -12,7 +13,7 @@ class G2PSchemaLivestock:
     livestock_system: Optional[LivestockSystemEnum] = None
 
 
-class G2PRegisterSchemaLivestock(G2PRegisterBaseSchema, G2PSchemaLivestock):
+class G2PRegisterSchemaLivestock(G2PRegisterBaseSchema, G2PSchemaLivestock, OANSchemaLivestock):
     """
     Schema for Livestock register.
     Inherits fields from G2PRegisterBaseSchema.
@@ -27,7 +28,7 @@ class G2PRegisterHistorySchemaLivestock(G2PRegisterHistorySchema):
     """
 
 
-class G2PIntakeFormSchemaLivestock(G2PIntakeFormSchemaBase, G2PRegisterBaseSchema, G2PSchemaLivestock):
+class G2PIntakeFormSchemaLivestock(G2PIntakeFormSchemaBase, G2PRegisterBaseSchema, G2PSchemaLivestock, OANSchemaLivestock):
     """
     Schema for Livestock intake form.
     Inherits fields from G2PRegisterBaseSchema.
