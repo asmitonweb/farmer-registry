@@ -15,17 +15,16 @@ from sqlalchemy import Boolean, Numeric, String, Text
 # register mnemonic -> {field: (column type, python type)}
 OAN_FIELDS: dict[str, dict[str, tuple]] = {
     "Farmer": {
-        # The same names in Ethiopic and Afaan Oromo script.
+        # An Ethiopian name is the person's, the father's and the grandfather's
+        # name, which upstream's first, middle and last name hold in English.
+        # The same three names in Amharic, and in the farmer's primary language
+        # (upstream's language_spoken) when that is not Amharic.
         "first_name_amh": (String, str),
         "middle_name_amh": (String, str),
         "last_name_amh": (String, str),
-        "first_name_om": (String, str),
-        "middle_name_om": (String, str),
-        "last_name_om": (String, str),
-        # The father's own names.
-        "father_first_name": (String, str),
-        "father_middle_name": (String, str),
-        "father_last_name": (String, str),
+        "first_name_other": (String, str),
+        "middle_name_other": (String, str),
+        "last_name_other": (String, str),
         # Productive Safety Net Programme beneficiary.
         "is_psnp_user": (Boolean, bool),
     },

@@ -67,3 +67,12 @@ WHERE "tab_section_id" IN (
 )
 AND EXISTS (SELECT 1 FROM "public"."g2p_intake_form_ui_tab_sections" o
             WHERE o."tab_section_id" = 'oan_' || "g2p_intake_form_ui_tab_sections"."tab_section_id");
+
+-- The photo section, on the intake form only, right after personal
+-- identification (see 10_sections.sql for why not on the register tabs).
+INSERT INTO "public"."g2p_intake_form_ui_tab_sections" ("tab_section_id", "tab_id", "section_id", "section_order")
+SELECT 'oan_farmer_photo_intake', t.tab_id, 'oan_farmer_photo', t.section_order + 5
+FROM "public"."g2p_intake_form_ui_tab_sections" t
+WHERE t.tab_section_id = 'oan_tab_section_3'
+ON CONFLICT ("tab_section_id") DO UPDATE SET
+  "tab_id" = EXCLUDED."tab_id", "section_id" = EXCLUDED."section_id", "section_order" = EXCLUDED."section_order";

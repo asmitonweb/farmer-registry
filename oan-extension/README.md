@@ -23,14 +23,14 @@ Each file runs after the whole farmer seed, in name order:
 
 | File | Does |
 |---|---|
-| `10_sections.sql` | derives each OAN section from the upstream one plus the OAN widgets, so upstream changes carry over on the next seed |
+| `10_sections.sql` | derives each OAN section from the upstream one plus the OAN widgets, so upstream changes carry over on the next seed; adds the intake photo section |
 | `20_layout.sql` | attaches the OAN sections where the upstream ones were, then detaches those by explicit id |
 | `30_translations.sql` | adds labels to each language's domain translations; upstream wording wins on a shared key |
-| `40_deduplication.sql` | the farmer duplicate check, with the father's first name added |
+| `40_deduplication.sql` | the farmer duplicate check, with the father's name (middle name) added |
 | `90_checks.sql` | raises an error in the seed log if anything above did not apply |
 
 Upstream section rows are never changed. Code lists (body condition,
-production type, commodities) come from the country pack in Master Data.
+production type, commodities, primary language) come from the country pack in Master Data.
 
 ## Validation on the server
 

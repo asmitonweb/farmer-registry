@@ -10,8 +10,10 @@ BEGIN
   SELECT string_agg(f, ', ') INTO missing
   FROM (VALUES
     ('oan_farmer_personal_identification', 'first_name_amh'),
-    ('oan_farmer_personal_identification', 'last_name_om'),
-    ('oan_farmer_personal_identification', 'father_last_name'),
+    ('oan_farmer_personal_identification', 'last_name_other'),
+    ('oan_farmer_personal_identification', 'language_spoken'),
+    ('oan_farmer_personal_identification', 'birth_date'),
+    ('oan_farmer_photo', 'farmer-photo'),
     ('oan_farmer_socio_economic_and_health', 'is_psnp_user'),
     ('oan_farmer_membership_details', 'primary_commodity'),
     ('oan_farmer_lands', 'land_id'),
@@ -44,7 +46,7 @@ BEGIN
   SELECT string_agg(section_id, ', ') INTO missing
   FROM (VALUES ('oan_farmer_personal_identification'), ('oan_farmer_socio_economic_and_health'),
                ('oan_farmer_membership_details'), ('oan_farmer_lands'), ('oan_farmer_livestock_intake'),
-               ('oan_farmer_farm_inputs_intake')) e(section_id)
+               ('oan_farmer_farm_inputs_intake'), ('oan_farmer_photo')) e(section_id)
   WHERE NOT EXISTS (SELECT 1 FROM "public"."g2p_intake_form_ui_tab_sections" t WHERE t.section_id = e.section_id);
   IF missing IS NOT NULL THEN
     RAISE EXCEPTION 'OAN sections not on the intake form: %', missing;

@@ -1,4 +1,5 @@
--- OAN sections: each one is an upstream section plus the OAN widgets.
+-- OAN sections: each one is an upstream section plus the OAN widgets, and the
+-- intake photo section.
 --
 -- The image copies this folder to /seed/meta_data/zz-oan/, so it runs after the
 -- farmer seed has upserted its own rows. Every OAN row is derived from the
@@ -6,45 +7,9 @@
 -- the next time the seed runs. Upstream rows are never updated; 20_layout.sql
 -- only detaches them from the tabs.
 
+-- Sections that only gain widgets: the items are appended to the array at path.
 WITH additions (upstream_section_id, oan_section_id, path, items) AS (
   VALUES
-  -- Personal identification: the names in Ethiopic and Latin script, and the
-  -- father's names, as a second row under upstream's three columns.
-  ('farmer_farmer_personal_identification_section_01',
-   'oan_farmer_personal_identification',
-   '{panels}'::text[],
-   '[{"panel-id": "oan_panel_other_names", "panel-orientation": "horizontal", "panels": [
-      {"panel-id": "oan_panel_names_amh", "panel-title": "names_in_amharic", "panel-orientation": "vertical", "widgets": [
-        {"widget": "text", "widget-id": "first_name_amh", "widget-type": "input", "widget-label": "first_name_amh",
-         "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.first_name_amh",
-         "widget-data-validation": {"pattern": "^[\\u1200-\\u137F\\u2D80-\\u2DDF\\uAB00-\\uAB2F ]+$", "maxLength": 100, "patternMessage": "ethiopic_script_only"}},
-        {"widget": "text", "widget-id": "middle_name_amh", "widget-type": "input", "widget-label": "middle_name_amh",
-         "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.middle_name_amh",
-         "widget-data-validation": {"pattern": "^[\\u1200-\\u137F\\u2D80-\\u2DDF\\uAB00-\\uAB2F ]+$", "maxLength": 100, "patternMessage": "ethiopic_script_only"}},
-        {"widget": "text", "widget-id": "last_name_amh", "widget-type": "input", "widget-label": "last_name_amh",
-         "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_name_amh",
-         "widget-data-validation": {"pattern": "^[\\u1200-\\u137F\\u2D80-\\u2DDF\\uAB00-\\uAB2F ]+$", "maxLength": 100, "patternMessage": "ethiopic_script_only"}}]},
-      {"panel-id": "oan_panel_names_om", "panel-title": "names_in_afaan_oromo", "panel-orientation": "vertical", "widgets": [
-        {"widget": "text", "widget-id": "first_name_om", "widget-type": "input", "widget-label": "first_name_om",
-         "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.first_name_om",
-         "widget-data-validation": {"pattern": "^[A-Za-z'' -]+$", "maxLength": 100, "patternMessage": "latin_script_only"}},
-        {"widget": "text", "widget-id": "middle_name_om", "widget-type": "input", "widget-label": "middle_name_om",
-         "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.middle_name_om",
-         "widget-data-validation": {"pattern": "^[A-Za-z'' -]+$", "maxLength": 100, "patternMessage": "latin_script_only"}},
-        {"widget": "text", "widget-id": "last_name_om", "widget-type": "input", "widget-label": "last_name_om",
-         "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_name_om",
-         "widget-data-validation": {"pattern": "^[A-Za-z'' -]+$", "maxLength": 100, "patternMessage": "latin_script_only"}}]},
-      {"panel-id": "oan_panel_father_name", "panel-title": "father_name", "panel-orientation": "vertical", "widgets": [
-        {"widget": "text", "widget-id": "father_first_name", "widget-type": "input", "widget-label": "father_first_name",
-         "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.father_first_name",
-         "widget-data-validation": {"maxLength": 100}},
-        {"widget": "text", "widget-id": "father_middle_name", "widget-type": "input", "widget-label": "father_middle_name",
-         "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.father_middle_name",
-         "widget-data-validation": {"maxLength": 100}},
-        {"widget": "text", "widget-id": "father_last_name", "widget-type": "input", "widget-label": "father_last_name",
-         "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.father_last_name",
-         "widget-data-validation": {"maxLength": 100}}]}]}]'::jsonb),
-
   -- Socio-economic: Productive Safety Net Programme beneficiary.
   ('farmer_farmer_socio_economic_and_health_section_04',
    'oan_farmer_socio_economic_and_health',
@@ -140,3 +105,131 @@ ON CONFLICT ("section_id") DO UPDATE SET
   "cr_auto_approve_for_agent_portal" = EXCLUDED."cr_auto_approve_for_agent_portal",
   "cr_auto_approve_for_staff_portal" = EXCLUDED."cr_auto_approve_for_staff_portal",
   "cr_auto_approve_for_partner" = EXCLUDED."cr_auto_approve_for_partner";
+
+-- Personal identification, laid out as in the previous farmer registry: rows
+-- stacked in one vertical panel. Upstream's row comes first, with its first,
+-- middle and last name relabelled as the English first, father's and
+-- grandfather's name. Then the primary language, the names in Amharic, and the
+-- names in the primary language, which appear once a language is chosen and are
+-- disabled when it is Amharic. The widget conditions apply rules in order and
+-- the last show or hide wins, so "chosen and not Amharic" cannot be one rule.
+-- The 1.2 widgets do not render panel titles, so each label names its language.
+WITH relabel (widget_id, label) AS (
+  VALUES ('first_name', 'first_name_eng'), ('middle_name', 'fathers_name_eng'), ('last_name', 'grandfathers_name_eng')
+),
+name_fields (ord, field, label) AS (
+  VALUES (1, 'first_name', 'first_name'), (2, 'middle_name', 'fathers_name'), (3, 'last_name', 'grandfathers_name')
+),
+amharic AS (
+  SELECT jsonb_agg(jsonb_build_object(
+    'panel-id', 'oan_panel_amh_' || field, 'panel-orientation', 'vertical', 'widgets', jsonb_build_array(jsonb_build_object(
+      'widget', 'text', 'widget-id', field || '_amh', 'widget-type', 'input', 'widget-label', label || '_amh',
+      'widget-data-path', 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.' || field || '_amh',
+      'widget-data-validation', jsonb_build_object(
+        'pattern', '^[\u1200-\u137F\u2D80-\u2DDF\uAB00-\uAB2F ]+$', 'maxLength', 100,
+        'patternMessage', 'ethiopic_script_only'))))
+    ORDER BY ord) AS panels
+  FROM name_fields
+),
+other AS (
+  SELECT jsonb_agg(jsonb_build_object(
+    'panel-id', 'oan_panel_other_' || field, 'panel-orientation', 'vertical', 'widgets', jsonb_build_array(jsonb_build_object(
+      'widget', 'text', 'widget-id', field || '_other', 'widget-type', 'input', 'widget-label', label || '_other',
+      'widget-data-path', 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.' || field || '_other',
+      'widget-data-validation', jsonb_build_object('maxLength', 100),
+      'widget-data-options', jsonb_build_object('actions', jsonb_build_array(
+        jsonb_build_object('action', 'show', 'condition', jsonb_build_object(
+          'field', 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken', 'operator', 'notEmpty')),
+        jsonb_build_object('action', 'disable', 'condition', jsonb_build_object(
+          'field', 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken', 'operator', 'equals', 'value', 'AMHARIC')))))))
+    ORDER BY ord) AS panels
+  FROM name_fields
+),
+rows AS (
+  SELECT jsonb_build_array(
+    jsonb_build_object('panel-id', 'oan_panel_language', 'panel-orientation', 'horizontal', 'panels', jsonb_build_array(
+      jsonb_build_object('panel-id', 'oan_panel_language_spoken', 'panel-orientation', 'vertical', 'widgets', jsonb_build_array(
+        '{"widget": "select", "widget-id": "language_spoken", "widget-type": "input", "widget-label": "primary_language",
+          "widget-readonly": false, "widget-required": false,
+          "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken",
+          "widget-data-source": {"type": "api", "method": "POST", "params": {"attribute_id": "LANGUAGE"},
+                                 "service": "attributes", "endpoint": "values", "labelKey": "value_display", "valueKey": "value_code"}}'::jsonb)),
+      -- Two empty columns keep the select one column wide, as in the rows below.
+      jsonb_build_object('panel-id', 'oan_panel_language_spacer_1', 'panel-orientation', 'vertical', 'widgets', '[]'::jsonb),
+      jsonb_build_object('panel-id', 'oan_panel_language_spacer_2', 'panel-orientation', 'vertical', 'widgets', '[]'::jsonb))),
+    jsonb_build_object('panel-id', 'oan_panel_names_amh', 'panel-orientation', 'horizontal', 'panels', amharic.panels),
+    jsonb_build_object('panel-id', 'oan_panel_names_other', 'panel-orientation', 'horizontal', 'panels', other.panels)) AS items
+  FROM amharic, other
+),
+-- Upstream's panels with the name widgets relabelled; nothing else changes.
+upstream_panels AS (
+  SELECT u.section_id, jsonb_agg(
+    CASE WHEN jsonb_typeof(p->'panels') = 'array' THEN jsonb_set(p, '{panels}', (
+      SELECT jsonb_agg(CASE WHEN jsonb_typeof(c->'widgets') = 'array' THEN jsonb_set(c, '{widgets}', (
+        SELECT COALESCE(jsonb_agg(w || COALESCE((SELECT jsonb_build_object('widget-label', r.label)
+                                                 FROM relabel r WHERE r.widget_id = w->>'widget-id'), '{}'::jsonb)
+                                  ORDER BY wi), '[]'::jsonb)
+        FROM jsonb_array_elements(c->'widgets') WITH ORDINALITY x(w, wi))) ELSE c END ORDER BY ci)
+      FROM jsonb_array_elements(p->'panels') WITH ORDINALITY y(c, ci))) ELSE p END
+    ORDER BY pi) AS panels
+  FROM "public"."g2p_register_sections" u,
+       jsonb_array_elements(u.section_ui_schema->'panels') WITH ORDINALITY z(p, pi)
+  WHERE u.section_id = 'farmer_farmer_personal_identification_section_01'
+  GROUP BY u.section_id
+)
+INSERT INTO "public"."g2p_register_sections" (
+  "register_id", "section_id", "section_register_id", "is_core_section", "section_mnemonic",
+  "section_description", "documents_required", "no_of_verifications_required", "is_list",
+  "section_weightage", "section_ui_schema", "cr_auto_approve_for_bene_portal",
+  "cr_auto_approve_for_agent_portal", "cr_auto_approve_for_staff_portal", "cr_auto_approve_for_partner")
+SELECT u.register_id, 'oan_farmer_personal_identification', u.section_register_id, u.is_core_section,
+       'oan_' || u.section_mnemonic, u.section_description, u.documents_required,
+       u.no_of_verifications_required, u.is_list, u.section_weightage,
+       jsonb_set(u.section_ui_schema, '{panels}', jsonb_build_array(jsonb_build_object(
+         'panel-id', 'oan_panel_personal_rows', 'panel-orientation', 'vertical',
+         'panels', up.panels || rows.items))),
+       u.cr_auto_approve_for_bene_portal, u.cr_auto_approve_for_agent_portal,
+       u.cr_auto_approve_for_staff_portal, u.cr_auto_approve_for_partner
+FROM "public"."g2p_register_sections" u
+JOIN upstream_panels up ON up.section_id = u.section_id
+CROSS JOIN rows
+ON CONFLICT ("section_id") DO UPDATE SET
+  "register_id" = EXCLUDED."register_id", "section_register_id" = EXCLUDED."section_register_id",
+  "is_core_section" = EXCLUDED."is_core_section", "section_mnemonic" = EXCLUDED."section_mnemonic",
+  "section_description" = EXCLUDED."section_description", "documents_required" = EXCLUDED."documents_required",
+  "no_of_verifications_required" = EXCLUDED."no_of_verifications_required", "is_list" = EXCLUDED."is_list",
+  "section_weightage" = EXCLUDED."section_weightage", "section_ui_schema" = EXCLUDED."section_ui_schema",
+  "cr_auto_approve_for_bene_portal" = EXCLUDED."cr_auto_approve_for_bene_portal",
+  "cr_auto_approve_for_agent_portal" = EXCLUDED."cr_auto_approve_for_agent_portal",
+  "cr_auto_approve_for_staff_portal" = EXCLUDED."cr_auto_approve_for_staff_portal",
+  "cr_auto_approve_for_partner" = EXCLUDED."cr_auto_approve_for_partner";
+
+-- Farmer photo for the intake form. The register's detail view already has the
+-- photo in upstream's header section (fr_farmer_header), with its own picker;
+-- the intake form has no header, so without this a photo could only be added
+-- after approval. This reuses the same header-section widget for its picker and
+-- preview, with only the image paths: the widget reads and writes nothing for a
+-- key without a path. On save the staff UI uploads the picked file and sets
+-- record_image_document_id, the field the detail view's header shows. It is
+-- attached to the intake form only (20_layout.sql), so the detail view does not
+-- get a second picker for the same field.
+INSERT INTO "public"."g2p_register_sections" (
+  "register_id", "section_id", "section_register_id", "is_core_section", "section_mnemonic",
+  "section_description", "documents_required", "no_of_verifications_required", "is_list",
+  "section_weightage", "section_ui_schema", "cr_auto_approve_for_bene_portal",
+  "cr_auto_approve_for_agent_portal", "cr_auto_approve_for_staff_portal", "cr_auto_approve_for_partner")
+VALUES (
+  'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd', 'oan_farmer_photo', 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd', false,
+  'oan_fr_farmer_photo', 'Farmer photo', false, 0, false, 0,
+  '{"section-id": "farmer_photo", "section-title": "farmer_photo", "section-editable": true, "section-column-span": 3,
+    "panels": [{"panel-id": "oan_panel_farmer_photo", "panel-orientation": "vertical", "widgets": [
+      {"widget": "header-section", "widget-id": "farmer-photo", "widget-type": "group", "widget-label": "farmer_photo",
+       "widget-readonly": false, "widget-required": false,
+       "widget-data-path": {"image": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.record_image_document_id",
+                            "imageUrl": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.record_image_url"},
+       "widget-data-format": {"imageSize": 120}}]}]}'::jsonb,
+  false, false, false, false)
+ON CONFLICT ("section_id") DO UPDATE SET
+  "register_id" = EXCLUDED."register_id", "section_register_id" = EXCLUDED."section_register_id",
+  "section_mnemonic" = EXCLUDED."section_mnemonic", "section_description" = EXCLUDED."section_description",
+  "section_ui_schema" = EXCLUDED."section_ui_schema";
