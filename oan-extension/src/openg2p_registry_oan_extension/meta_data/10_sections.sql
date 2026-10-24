@@ -205,12 +205,15 @@ ON CONFLICT ("section_id") DO UPDATE SET
   "cr_auto_approve_for_partner" = EXCLUDED."cr_auto_approve_for_partner";
 
 -- Farmer photo for the intake form. The register's detail view already has the
--- photo in upstream's header section (fr_farmer_header), with its own picker;
--- the intake form has no header, so without this a photo could only be added
--- after approval. This reuses the same header-section widget for its picker and
--- preview, with only the image paths: the widget reads and writes nothing for a
--- key without a path. On save the staff UI uploads the picked file and sets
--- record_image_document_id, the field the detail view's header shows. It is
+-- photo in upstream's header section (fr_farmer_header); the intake form has no
+-- header, so without this a photo could only be added after approval.
+--
+-- The widget is OAN's own (ui/staff-ui/overrides/src/oan/widgets/): take a photo
+-- with the device camera or choose a file, preview, replace, remove. The widget
+-- package uploads a section's photo, and sets record_image_document_id, the
+-- field the detail view's header shows, only for widgets of type
+-- "header-section". So the section declares that type, and "widget-variant"
+-- selects the OAN widget; every other header-section stays upstream's. It is
 -- attached to the intake form only (20_layout.sql), so the detail view does not
 -- get a second picker for the same field.
 INSERT INTO "public"."g2p_register_sections" (
@@ -223,11 +226,12 @@ VALUES (
   'oan_fr_farmer_photo', 'Farmer photo', false, 0, false, 0,
   '{"section-id": "farmer_photo", "section-title": "farmer_photo", "section-editable": true, "section-column-span": 3,
     "panels": [{"panel-id": "oan_panel_farmer_photo", "panel-orientation": "vertical", "widgets": [
-      {"widget": "header-section", "widget-id": "farmer-photo", "widget-type": "group", "widget-label": "farmer_photo",
-       "widget-readonly": false, "widget-required": false,
+      {"widget": "header-section", "widget-variant": "oan-farmer-photo", "widget-id": "farmer-photo",
+       "widget-type": "group", "widget-label": "farmer_photo", "widget-readonly": false, "widget-required": false,
        "widget-data-path": {"image": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.record_image_document_id",
                             "imageUrl": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.record_image_url"},
-       "widget-data-format": {"imageSize": 120}}]}]}'::jsonb,
+       "widget-data-format": {"imageSize": 160, "maxDimension": 1024, "jpegQuality": 0.85},
+       "widget-data-validation": {"maxSizeKb": 2048}}]}]}'::jsonb,
   false, false, false, false)
 ON CONFLICT ("section_id") DO UPDATE SET
   "register_id" = EXCLUDED."register_id", "section_register_id" = EXCLUDED."section_register_id",

@@ -15,7 +15,22 @@ platform's Extensions Contract describes for coexisting extensions.
 | `meta_data/` | the `oan_` metadata layer, applied after the farmer's (`/seed/meta_data/zz-oan/`) |
 | `tests/` | `uv run --no-project --with pytest pytest oan-extension/tests` |
 
-Images are built FROM the published farmer images (`docker/oan/`).
+Images are built FROM the published farmer images (`docker/oan/`). The staff
+UI image is upstream's staff UI build, from the commit of the published image,
+with `ui/staff-ui/overrides/` copied on top (`docker/oan/staff-ui.Dockerfile`).
+
+## Staff UI widgets
+
+`ui/staff-ui/overrides/src/oan/widgets/` holds OAN's widgets, registered from
+the one overridden upstream file, `src/shared/widgets/RegistryWidgetProvider.tsx`
+(a single added import).
+
+The farmer photo (`FarmerPhotoWidget.tsx`) takes a photo with the device camera
+or from a file, previews it, and scales it down before upload. The widget
+package uploads a section's photo into `record_image_document_id` only for
+widgets of type `header-section`, so the photo section declares that type with
+`"widget-variant": "oan-farmer-photo"`, and the OAN registration renders the
+OAN widget for that variant and upstream's header for everything else.
 
 ## Metadata layer
 
