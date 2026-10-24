@@ -3,8 +3,8 @@
 # demo users needed to run the Farmer Registry locally. Safe to re-run.
 #
 # Trimmed from openg2p-developer's multi-product keycloak-init.sh down to
-# just what farmer-registry needs: the IAM SSO client, the farmer staff
-# portal client + its roles, the AWE admin client + resolver, and three
+# just what farmer-registry needs: one shared browser/API client, the AWE
+# admin client + resolver, and three
 # demo users (staff, plus the two AWE approvers seeded in awe_meta_data).
 set -euo pipefail
 
@@ -15,7 +15,8 @@ KEYCLOAK_REALM="${KEYCLOAK_REALM:-staff}"
 IAM_STAFF_PORT="${IAM_STAFF_PORT:-8020}"
 FARMER_REGISTRY_UI_PORT="${FARMER_REGISTRY_UI_PORT:-3001}"
 AWE_UI_PORT="${AWE_UI_PORT:-8031}"
-KEYCLOAK_IAM_CLIENT_SECRET="${KEYCLOAK_IAM_CLIENT_SECRET:-dev-iam-staff-secret}"
+KEYCLOAK_SHARED_CLIENT_ID="${KEYCLOAK_SHARED_CLIENT_ID:-farmer-registry-staff-portal}"
+KEYCLOAK_SHARED_CLIENT_SECRET="${KEYCLOAK_SHARED_CLIENT_SECRET:-${KEYCLOAK_IAM_CLIENT_SECRET:-dev-iam-staff-secret}}"
 KEYCLOAK_AWE_RESOLVER_CLIENT_SECRET="${KEYCLOAK_AWE_RESOLVER_CLIENT_SECRET:-dev-awe-resolver-secret}"
 KEYCLOAK_INGESTION_CLIENT_SECRET="${KEYCLOAK_INGESTION_CLIENT_SECRET:-dev-registry-ingestion-secret}"
 KEYCLOAK_DEV_USER="${KEYCLOAK_DEV_USER:-staff}"
@@ -41,6 +42,18 @@ REGISTRY_STAFF_CLIENT_ROLES=(
   "Integration Specialist"
   "Reference Data Specialist"
   "Technical Administrator"
+)
+
+# The local Grievance API reuses the Farmer Registry's resource client so the
+# existing IAM login produces one bearer token usable by both applications.
+# IAM delegated login synchronizes roles by name into Frappe. Keep these role
+# names identical to the Grievance Frappe roles; the shared client still keeps
+# them separate from roles belonging to other clients.
+GRIEVANCE_CLIENT_ID="${KEYCLOAK_GRIEVANCE_CLIENT_ID:-${KEYCLOAK_SHARED_CLIENT_ID}}"
+GRIEVANCE_ROLES=(
+  "Grievance Submitter"
+  "Grievance Officer"
+  "Grievance Admin"
 )
 
 KCADM="${KCADM:-/opt/keycloak/bin/kcadm.sh}"
@@ -128,6 +141,28 @@ ensure_client_role() {
   "${KCADM}" create "clients/${client_uuid}/roles" -r "${KEYCLOAK_REALM}" -s "name=${role_name}" >/dev/null 2>&1 || true
 }
 
+ensure_client_audience_mapper() {
+  local client_id="$1"
+  local client_uuid
+  client_uuid="$(client_internal_id "${client_id}")"
+  [[ -n "${client_uuid}" ]] || return 0
+
+  if "${KCADM}" get "clients/${client_uuid}/protocol-mappers/models" -r "${KEYCLOAK_REALM}" \
+    --fields name --format csv --noquotes | grep -qx "aon-shared-client-audience"; then
+    return 0
+  fi
+
+  echo "[keycloak-init]   + audience mapper ${client_id}/aon-shared-client-audience"
+  "${KCADM}" create "clients/${client_uuid}/protocol-mappers/models" -r "${KEYCLOAK_REALM}" \
+    -s name=aon-shared-client-audience \
+    -s protocol=openid-connect \
+    -s protocolMapper=oidc-audience-mapper \
+    -s "config.\"included.client.audience\"=${client_id}" \
+    -s 'config."access.token.claim"=true' \
+    -s 'config."id.token.claim"=false' \
+    -s 'config."userinfo.token.claim"=false' >/dev/null
+}
+
 assign_client_role() {
   local username="$1"
   local client_id="$2"
@@ -200,7 +235,7 @@ ensure_dev_user() {
     "Developer"
 
   for role in "${REGISTRY_STAFF_CLIENT_ROLES[@]}"; do
-    assign_client_role "${KEYCLOAK_DEV_USER}" "farmer-registry-staff-portal" "${role}"
+    assign_client_role "${KEYCLOAK_DEV_USER}" "${KEYCLOAK_SHARED_CLIENT_ID}" "${role}"
   done
 
   assign_client_role "${KEYCLOAK_DEV_USER}" "awe-admin-portal" "AWE_ADMIN"
@@ -222,7 +257,7 @@ ensure_staff_admin_user() {
     "Admin"
 
   for role in "${REGISTRY_STAFF_CLIENT_ROLES[@]}"; do
-    assign_client_role "${KEYCLOAK_STAFF_ADMIN_USER}" "farmer-registry-staff-portal" "${role}"
+    assign_client_role "${KEYCLOAK_STAFF_ADMIN_USER}" "${KEYCLOAK_SHARED_CLIENT_ID}" "${role}"
   done
 
   assign_client_role "${KEYCLOAK_STAFF_ADMIN_USER}" "awe-admin-portal" "AWE_ADMIN"
@@ -241,9 +276,21 @@ ensure_awe_approver_users() {
 
   for username in alex.carter nina.patel; do
     for role in "${AWE_APPROVER_ROLES[@]}"; do
-      assign_client_role "${username}" "farmer-registry-staff-portal" "${role}"
+      assign_client_role "${username}" "${KEYCLOAK_SHARED_CLIENT_ID}" "${role}"
     done
   done
+}
+
+ensure_grievance_roles() {
+  for role in "${GRIEVANCE_ROLES[@]}"; do
+    ensure_client_role "${GRIEVANCE_CLIENT_ID}" "${role}"
+  done
+
+  # Local smoke-test identities. Production role assignment remains explicit;
+  # this only makes staff/admin useful immediately after `up farmer`.
+  assign_client_role "${KEYCLOAK_DEV_USER}" "${GRIEVANCE_CLIENT_ID}" "Grievance Officer"
+  assign_client_role "${KEYCLOAK_STAFF_ADMIN_USER}" "${GRIEVANCE_CLIENT_ID}" "Grievance Admin"
+
 }
 
 ensure_awe_clients() {
@@ -289,13 +336,15 @@ ensure_realm
 
 echo "[keycloak-init] Ensuring OIDC clients in realm '${KEYCLOAK_REALM}' ..."
 
-# IAM Staff Portal API — confidential client used for the browser SSO code flow.
+# One shared AON client used by IAM's browser code flow and the Farmer Registry
+# and Grievance resource APIs. One token therefore carries both applications'
+# namespaced roles.
 IAM_POST_LOGOUT_REDIRECT_URIS="http://localhost:${FARMER_REGISTRY_UI_PORT}/*##http://localhost:${IAM_STAFF_PORT}/auth/callback"
 IAM_CLIENT_ATTRIBUTES="$(printf '{"post.logout.redirect.uris":"%s"}' "${IAM_POST_LOGOUT_REDIRECT_URIS}")"
-ensure_client "iam-staff-portal" \
+ensure_client "${KEYCLOAK_SHARED_CLIENT_ID}" \
   -s enabled=true \
   -s publicClient=false \
-  -s secret="${KEYCLOAK_IAM_CLIENT_SECRET}" \
+  -s secret="${KEYCLOAK_SHARED_CLIENT_SECRET}" \
   -s standardFlowEnabled=true \
   -s directAccessGrantsEnabled=true \
   -s serviceAccountsEnabled=false \
@@ -303,23 +352,17 @@ ensure_client "iam-staff-portal" \
   -s 'webOrigins=["+"]' \
   -s "attributes=${IAM_CLIENT_ATTRIBUTES}"
 
-ensure_client "farmer-registry-staff-portal" \
-  -s enabled=true \
-  -s publicClient=true \
-  -s standardFlowEnabled=true \
-  -s directAccessGrantsEnabled=true \
-  -s 'redirectUris=["http://localhost:'"${FARMER_REGISTRY_UI_PORT}"'/*"]' \
-  -s 'webOrigins=["http://localhost:'"${FARMER_REGISTRY_UI_PORT}"'"]'
-
 ensure_awe_clients
+ensure_client_audience_mapper "${KEYCLOAK_SHARED_CLIENT_ID}"
 
 for role in "${REGISTRY_STAFF_CLIENT_ROLES[@]}"; do
-  ensure_client_role "farmer-registry-staff-portal" "${role}"
+  ensure_client_role "${KEYCLOAK_SHARED_CLIENT_ID}" "${role}"
 done
 
 ensure_dev_user
 ensure_staff_admin_user
 ensure_awe_approver_users
+ensure_grievance_roles
 
 echo "[keycloak-init] Done. Realm: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}"
 echo "[keycloak-init] Dev login: ${KEYCLOAK_DEV_USER} / ${KEYCLOAK_DEV_PASSWORD}"
