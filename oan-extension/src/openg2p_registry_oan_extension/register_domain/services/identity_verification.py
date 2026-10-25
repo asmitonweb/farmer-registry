@@ -44,7 +44,13 @@ from openg2p_registry_core.services import (
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from ..identity_claims import explain_failure, map_claims, same_value
+from ..identity_claims import (
+    LOCAL_NAME_FIELDS,
+    explain_failure,
+    local_name_values,
+    map_claims,
+    same_value,
+)
 from .identity_completion import ReplayAdapters, completion_context
 from .identity_token_timeout import TokenExchangeTimeout, token_timeout_seconds
 
@@ -306,7 +312,7 @@ class OANRegistrantAuthenticationService(G2PRegistrantAuthenticationService):
             return "EXPIRED", "The Fayda sign-in was not finished in time. Verify the farmer again"
         return auth.status, None
 
-    async def get_identity_verification(self, *, verification_id: str, staff_id: str) -> dict:
+    async def get_identity_verification(self, *, verification_id: str, staff_id: str, language: str | None = None) -> dict:
         async with self._session() as session:
             auth, provider = await self._verification(session, verification_id)
         if auth.initiated_by_staff_id != staff_id:
@@ -325,7 +331,8 @@ class OANRegistrantAuthenticationService(G2PRegistrantAuthenticationService):
             "values": {},
         }
         if status == "SUCCESS":
-            result["foundational_id"], result["values"] = self._verified(auth, provider)
+            result["foundational_id"], values = self._verified(auth, provider)
+            result["values"] = local_name_values(values, language)
         return result
 
     async def _stored(self, session, model_names: tuple[str, ...], internal_record_id: str) -> dict | None:
@@ -382,6 +389,7 @@ class OANRegistrantAuthenticationService(G2PRegistrantAuthenticationService):
                     continue
                 subject, verified = self._verified(auth, provider)
                 merged = {**(stored or {}), **record}
+                verified = local_name_values(verified, merged.get("language_spoken"))
                 fin = merged.get("foundational_id")
                 if not subject or not re.fullmatch(r"[0-9]{12}", str(subject)):
                     problems.append("FIN (Fayda ID): Fayda did not return a valid FIN. Verify again or contact support")
@@ -397,6 +405,11 @@ class OANRegistrantAuthenticationService(G2PRegistrantAuthenticationService):
                             f"{labels.get(field, field)}: Fayda verified it as \"{value}\" and it cannot be changed. "
                             "Undo the change; if the farmer's Fayda record is wrong, it has to be corrected there"
                         )
+                # Whether the own-language name is Fayda's follows the language:
+                # it locks the names on the form, and is no longer so once the
+                # farmer's language is changed to one Fayda does not give.
+                if any(f in record for f in (*LOCAL_NAME_FIELDS, "language_spoken", "identity_verification_id")):
+                    record["local_name_from_fayda"] = bool(verified.get("local_name_from_fayda"))
                 record.update(
                     last_authentication_status=status,
                     last_authenticated_on=_day(auth.completed_at),

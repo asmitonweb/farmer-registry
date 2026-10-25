@@ -97,11 +97,21 @@ def test_phone_rejects_and_foreign():
 def test_farmer_search_text_is_ids_and_names_only():
     text = derived.farmer_search_text({
         "functional_record_id": "FR-1", "foundational_id": "121654377346", "rid": None,
-        "first_name": "Abebe", "middle_name": "Kebede", "last_name": "Tesfaye", "first_name_amh": "አበበ",
+        "first_name": "Abebe", "middle_name": "Kebede", "last_name": "Tesfaye", "first_name_local": "አበበ",
         "gender": "MALE", "birth_date": "1984-08-06", "education_level": "PRIMARY", "latitude": 14.4})
     assert text == "FR-1 121654377346 Abebe Kebede Tesfaye አበበ"
 
 
-def test_farmer_search_text_has_the_names_in_other_languages():
-    text = derived.farmer_search_text({"first_name": "Abebe", "other_language_names": "Caaltuu Gammachuu"})
-    assert text == "Abebe Caaltuu Gammachuu"
+def test_local_name_in_a_geez_language_must_be_geez():
+    assert derived.local_name_problems({"language_spoken": "AMHARIC", "first_name_local": "አበበ"}) == []
+    problem, = derived.local_name_problems({"language_spoken": "TIGRINYA", "first_name_local": "Abebe"})
+    assert problem.startswith("First Name (own language): Tigrinya is written in Ethiopic (Ge'ez) script")
+
+
+def test_local_name_in_a_latin_language_is_kept_as_typed():
+    assert derived.local_name_problems({"language_spoken": "AFAAN_OROMO", "first_name_local": "Caaltuu"}) == []
+
+
+def test_local_name_needs_its_language():
+    problem, = derived.local_name_problems({"language_spoken": None, "first_name_local": "Caaltuu"})
+    assert problem.startswith("Farmer's Language: the name is entered in the farmer's language, but no language is chosen")

@@ -79,10 +79,13 @@ doc_widgets (col, ord, w) AS (
 ),
 form_layout (oan_section_id, upstream_section_id, col, ord, w) AS (
   VALUES
-  -- Name: English and Amharic names, as Fayda has them, and the farmer's
-  -- primary language. Upstream's first, middle and last name are the English
-  -- first, father's and grandfather's name. Names in any other language are
-  -- the next section's rows (oan_farmer_names, 15_sections.sql).
+  -- Name: the farmer's name in English and in their own language, each as
+  -- the first, father's and grandfather's name (upstream's first, middle and
+  -- last name are the English ones). The language is upstream's
+  -- language_spoken. Fayda fills in the English name, and the own-language
+  -- name when the language is Amharic or not chosen yet; both are then
+  -- locked (the server refuses a change). Names in a Ge'ez-script language
+  -- must be in Ge'ez (derived.local_name_problems).
   ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 1, 1,
    '{"widget-id": "first_name", "widget-label": "first_name_eng",
      "widget-data-options": {"action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_authentication_status", "operator": "equals", "value": "SUCCESS"}}}'::jsonb),
@@ -92,34 +95,39 @@ form_layout (oan_section_id, upstream_section_id, col, ord, w) AS (
   ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 1, 3,
    '{"widget-id": "last_name", "widget-label": "grandfathers_name_eng",
      "widget-data-options": {"action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_authentication_status", "operator": "equals", "value": "SUCCESS"}}}'),
+  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 2, 5,
+   '{"widget": "oan-local-name", "widget-id": "local_name", "widget-type": "input", "widget-label": "local_name",
+     "widget-readonly": false, "widget-required": false,
+     "widget-data-path": {"marker": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.local_name_from_fayda"},
+     "widget-data-options": {"languagePath": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken", "language": "AMHARIC",
+                            "fields": ["a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.first_name_local", "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.middle_name_local", "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_name_local"]}}'),
   ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 1, 1, '{"widget-id": "gender", "widget-data-options": {"action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_authentication_status", "operator": "equals", "value": "SUCCESS"}}}'),
   ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 1, 2,
-   '{"widget-id": "birth_date", "widget-variant": "ethiopian"}'),
+   -- Upstream disables the birth date once an age is typed; one rule decides
+   -- (the last wins), so here it is locked once Fayda verified it instead,
+   -- and the server checks the age against the birth date.
+   '{"widget-id": "birth_date", "widget-variant": "ethiopian",
+     "widget-data-options": {"maxDate": "today", "minDate": "1900-01-01",
+       "action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_authentication_status", "operator": "equals", "value": "SUCCESS"}}}'),
   ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 1, 4, '{"widget-id": "estimated_age", "widget-data-format": {"allowSigned": false, "numericType": "integer"}}'),
   ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 2, 1,
-   '{"widget": "text", "widget-id": "first_name_amh", "widget-type": "input", "widget-label": "first_name_amh",
-     "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.first_name_amh",
-     "widget-data-validation": {"pattern": "^[\u1200-\u137f\u2d80-\u2ddf\uab00-\uab2f ]+$", "maxLength": 100,
-                                "patternMessage": "ethiopic_script_only"},
-     "widget-data-options": {"action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_authentication_status", "operator": "equals", "value": "SUCCESS"}}}'),
-  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 2, 2,
-   '{"widget": "text", "widget-id": "middle_name_amh", "widget-type": "input", "widget-label": "fathers_name_amh",
-     "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.middle_name_amh",
-     "widget-data-validation": {"pattern": "^[\u1200-\u137f\u2d80-\u2ddf\uab00-\uab2f ]+$", "maxLength": 100,
-                                "patternMessage": "ethiopic_script_only"},
-     "widget-data-options": {"action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_authentication_status", "operator": "equals", "value": "SUCCESS"}}}'),
-  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 2, 3,
-   '{"widget": "text", "widget-id": "last_name_amh", "widget-type": "input", "widget-label": "grandfathers_name_amh",
-     "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_name_amh",
-     "widget-data-validation": {"pattern": "^[\u1200-\u137f\u2d80-\u2ddf\uab00-\uab2f ]+$", "maxLength": 100,
-                                "patternMessage": "ethiopic_script_only"},
-     "widget-data-options": {"action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_authentication_status", "operator": "equals", "value": "SUCCESS"}}}'),
-  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 2, 4,
-   '{"widget": "select", "widget-id": "language_spoken", "widget-type": "input", "widget-label": "primary_language",
+   '{"widget": "select", "widget-id": "language_spoken", "widget-type": "input", "widget-label": "farmers_language",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken",
      "widget-data-source": {"type": "api", "method": "POST", "params": {"attribute_id": "LANGUAGE"},
                             "service": "attributes", "endpoint": "values", "labelKey": "value_display", "valueKey": "value_code"}}'),
+  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 2, 2,
+   '{"widget": "text", "widget-id": "first_name_local", "widget-type": "input", "widget-label": "first_name_local",
+     "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.first_name_local", "widget-data-validation": {"maxLength": 100},
+     "widget-data-options": {"action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.local_name_from_fayda", "operator": "equals", "value": true}}}'),
+  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 2, 3,
+   '{"widget": "text", "widget-id": "middle_name_local", "widget-type": "input", "widget-label": "fathers_name_local",
+     "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.middle_name_local", "widget-data-validation": {"maxLength": 100},
+     "widget-data-options": {"action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.local_name_from_fayda", "operator": "equals", "value": true}}}'),
+  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 2, 4,
+   '{"widget": "text", "widget-id": "last_name_local", "widget-type": "input", "widget-label": "grandfathers_name_local",
+     "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_name_local", "widget-data-validation": {"maxLength": 100},
+     "widget-data-options": {"action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.local_name_from_fayda", "operator": "equals", "value": true}}}'),
   ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 2, 1, '{"widget-id": "marital_status"}'),
   ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 2, 2, '{"widget-id": "education_level"}'),
   -- Identity, in the order it is filled in: whether the farmer has a national
@@ -151,6 +159,7 @@ form_layout (oan_section_id, upstream_section_id, col, ord, w) AS (
      "widget-data-options": {"registerId": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd", "fieldPrefix": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd",
                              "foundationalIdPath": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.foundational_id",
                              "internalRecordIdPath": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.internal_record_id",
+                             "languagePath": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken",
                              "action": "show", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.has_national_id", "operator": "equals", "value": true}}}'),
   ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 4,
    '{"widget": "text", "widget-id": "rid", "widget-type": "input", "widget-label": "fayda_rid",

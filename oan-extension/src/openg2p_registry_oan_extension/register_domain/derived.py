@@ -8,6 +8,7 @@ startup; here they are kept in step as records are saved.
 This module has no database or framework imports, so it can be tested alone.
 """
 
+import re
 from collections.abc import Iterable
 from datetime import date, datetime
 
@@ -146,6 +147,37 @@ def normalize_phone(number, country_code=None) -> tuple[str | None, str | None]:
     return digits, f"+{ETHIOPIA_CALLING_CODE}{digits}"
 
 
+# Languages written in Ethiopic (Ge'ez) script: the farmer's name in such a
+# language must be in it. Names in other languages are kept as typed, as
+# OpenG2P advises for names.
+ETHIOPIC_SCRIPT_LANGUAGES = {"AMHARIC": "Amharic", "TIGRINYA": "Tigrinya"}
+_ETHIOPIC_NAME = re.compile(r"^[ሀ-፿ⶀ-⷟꬀-꬯ ]+$")
+LOCAL_NAME_LABELS = {
+    "first_name_local": "First Name",
+    "middle_name_local": "Father's Name",
+    "last_name_local": "Grandfather's Name",
+}
+
+
+def local_name_problems(record: dict) -> list[str]:
+    """The farmer's own-language names without a language, or not in their
+    language's script."""
+    if "language_spoken" in record and not record.get("language_spoken") and any(
+        str(record.get(field) or "").strip() for field in LOCAL_NAME_LABELS
+    ):
+        return [("Farmer's Language: the name is entered in the farmer's language, but no language is chosen. "
+                 "Choose the language it is written in")]
+    language = ETHIOPIC_SCRIPT_LANGUAGES.get(record.get("language_spoken") or "")
+    if not language:
+        return []
+    return [
+        f"{label} (own language): {language} is written in Ethiopic (Ge'ez) script, and \"{value}\" is not. "
+        "Type the name in Ge'ez letters, or choose the farmer's language again"
+        for field, label in LOCAL_NAME_LABELS.items()
+        if (value := str(record.get(field) or "").strip()) and not _ETHIOPIC_NAME.match(value)
+    ]
+
+
 # What a user types to find a farmer: the ids, and the names in each language
 # (the middle name is the father's). search_text is indexed and matched as one
 # string, so anything else (gender, education, dates, coordinates) is left to
@@ -153,8 +185,7 @@ def normalize_phone(number, country_code=None) -> tuple[str | None, str | None]:
 FARMER_SEARCH_FIELDS = (
     "functional_record_id", "foundational_id", "rid",
     "first_name", "middle_name", "last_name",
-    "first_name_amh", "middle_name_amh", "last_name_amh",
-    "other_language_names",
+    "first_name_local", "middle_name_local", "last_name_local",
 )
 
 

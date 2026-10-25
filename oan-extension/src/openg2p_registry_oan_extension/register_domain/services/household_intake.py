@@ -7,12 +7,19 @@ the farmer on approval. The per-section hooks only see the section being saved,
 so the whole form is checked at finalize, the way the farmer extension checks a
 household's own intake form (household_submission_validation): exactly one of
 the two, and a new household's members by the farmer extension's roster rules.
+
+A household's head is the household's own attribute, so a farmer form never
+changes a registered household: answering Yes to Household Head is accepted
+only when that household already names the farmer as its head and no other
+farmer of it is its head. Otherwise the message says which change request to
+raise first. Nothing reaches a register without its own approval.
 """
 
 from openg2p_registry_farmer_extension.register_domain.services import (
     G2PFarmerIntakeFormDataService,
 )
 from openg2p_registry_farmer_extension.register_domain.services.domain_validation_utils import (
+    as_bool,
     is_blank,
     validation_error,
 )
@@ -42,6 +49,79 @@ def _say(messages: dict, key: str) -> str:
 
 def _get(row, key: str):
     return row.get(key) if isinstance(row, dict) else getattr(row, key, None)
+
+
+def _same_name(a, b) -> bool:
+    return " ".join(str(a or "").split()).casefold() == " ".join(str(b or "").split()).casefold()
+
+
+def farmer_name(farmer) -> str:
+    return " ".join(
+        str(_get(farmer, key)).strip() for key in ("first_name", "middle_name", "last_name")
+        if not is_blank(_get(farmer, key))
+    )
+
+
+def household_head_problems(name: str, household, other_heads: list[str]) -> list[str]:
+    """A farmer answered Yes to Household Head for a registered household."""
+    number = _get(household, "functional_record_id") or "the picked household"
+    head = _get(household, "household_head")
+    problems = []
+    if not _same_name(head, name):
+        problems.append(
+            f"Household Head: the farmer is marked as the head of {number}, whose registered head is "
+            f"{head or 'not set'}. A household's head changes only through a change request on that household: "
+            f"raise one on its Household Information making {name or 'this farmer'} the head, and submit this "
+            "again once it is approved. Or answer No to Household Head"
+        )
+    problems.extend(
+        f"Household Head: {other} is already the head of {number}. Raise a change request on {other}'s record "
+        "answering No to Household Head, and submit this again once it is approved. Or answer No to Household Head"
+        for other in other_heads
+    )
+    return problems
+
+
+def new_household_head_problems(farmers: list, household) -> list[str]:
+    """The head of a household entered on the form, set from the farmer who is
+    its head, so the approver sees the household as it will be registered."""
+    heads = [f for f in farmers if as_bool(_get(f, "is_household_head"))]
+    if household is None or not heads:
+        return []
+    name = farmer_name(heads[0])
+    typed = _get(household, "household_head")
+    if is_blank(typed):
+        if isinstance(household, dict):
+            household["household_head"] = name
+        else:
+            household.household_head = name
+        return []
+    if _same_name(typed, name):
+        return []
+    return [(
+        f"Household Head: the farmer is marked as the head, and the household information names {typed} as "
+        f"its head. Enter {name or 'the farmer'} as the household's head, or answer No to Household Head"
+    )]
+
+
+async def registered_household_head_problems(session, farmer, household_id, name: str) -> list[str]:
+    from openg2p_registry_extensions.register_domain.models import (
+        G2PRegisterFarmer,
+        G2PRegisterHousehold,
+    )
+
+    household = await session.get(G2PRegisterHousehold, household_id) if household_id else None
+    if household is None:
+        return []
+    others = (await session.execute(
+        select(G2PRegisterFarmer.record_name).where(
+            G2PRegisterFarmer.link_internal_record_id == household_id,
+            G2PRegisterFarmer.internal_record_id != str(_get(farmer, "internal_record_id") or ""),
+            G2PRegisterFarmer.is_household_head.is_(True),
+            G2PRegisterFarmer.record_status == "ACTIVE",
+        )
+    )).scalars().all()
+    return household_head_problems(name, household, [o or "another farmer" for o in others])
 
 
 def check_farmer_household(farmers: list, household, members: list, messages: dict | None = None) -> None:
@@ -111,6 +191,13 @@ async def check_farmer_submission(submission_id: str, session, submission=None) 
             held = await check_fayda_id_unique(farmer, label, session, messages, submission_id=submission_id)
             if held:
                 problems.append(held)
+        if farmer is not None and as_bool(farmer.is_household_head):
+            household = households[0] if households else None
+            if household is not None and farmer.link_internal_record_id in (None, "", household.internal_record_id):
+                problems.extend(new_household_head_problems(farmers, household))
+            else:
+                problems.extend(await registered_household_head_problems(
+                    session, farmer, farmer.link_internal_record_id, farmer_name(farmer)))
         if problems:
             validation_error("; ".join(problems))
     async with _reworded(messages):

@@ -144,7 +144,7 @@ def test_complete_without_fin_binds_verified_subject_and_core_stores_claims_once
 
 
 def test_a_sign_in_for_another_fin_than_the_typed_one_is_refused(monkeypatch):
-    service, auth, adapter, tx, _store = fixture(monkeypatch, subject=OTHER)
+    service, auth, _adapter, tx, _store = fixture(monkeypatch, subject=OTHER)
     tx.context["oan_form_fin"] = FIN
     asyncio.run(
         service.complete_authentication(state="state", authorization_code="code")

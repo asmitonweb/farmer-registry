@@ -47,6 +47,9 @@ class StartRequest(G2PRequest):
 
 class ResultPayload(BaseModel):
     verification_id: str
+    # The farmer's own language on the form: Fayda's Amharic name fills the
+    # own-language name only when it is Amharic or not chosen yet.
+    language: str | None = None
 
 
 class ResultBody(G2PRequestBody):
@@ -119,6 +122,7 @@ class OANIdentityVerificationController(BaseController):
             result = await self.service.get_identity_verification(
                 verification_id=g2p_request.request_body.request_payload.verification_id,
                 staff_id=_staff(request),
+                language=g2p_request.request_body.request_payload.language,
             )
             return _response(g2p_request, result)
         except Exception as error:

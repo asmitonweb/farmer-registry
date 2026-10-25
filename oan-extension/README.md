@@ -9,10 +9,10 @@ platform's Extensions Contract describes for coexisting extensions.
 | Path | Holds |
 |---|---|
 | `register_domain/fields.py` | the OAN columns on the farmer registers, declared once |
-| `register_domain/models/`, `schemas/` | append those columns to the farmer models and schemas; OAN's own registers, FarmerPhone and FarmerName (`registers.py`) |
+| `register_domain/models/`, `schemas/` | append those columns to the farmer models and schemas; OAN's own register, FarmerPhone (`registers.py`) |
 | `register_domain/derived.py` | the values derived rather than typed (land totals in hectares, location names, Ethiopian calendar dates, phone numbers, the farmer's search text), with no framework imports |
 | `register_domain/ethiopian_calendar.py` | Gregorian and Ethiopian calendar conversion |
-| `register_domain/services/` | the farmer domain services, each extended with the derived values (`derivations.py`) and the section widgets' value rules (`widget_rules.py`); the FarmerPhone and FarmerName services |
+| `register_domain/services/` | the farmer domain services, each extended with the derived values (`derivations.py`) and the section widgets' value rules (`widget_rules.py`); the FarmerPhone service |
 | `app.py` | the farmer initializer, plus migration of OAN registers |
 | `meta_data/` | the `oan_` metadata layer, applied after the farmer's (`/seed/meta_data/zz-oan/`) |
 | `seed/` | the db-seed entrypoint: sample people come from Master Data (the country pack's `samples/`) instead of the Kamuntu demo files; `OAN_SAMPLES_FROM_MASTER_DATA=false` keeps the farmer seed's own |
@@ -58,8 +58,9 @@ Following OpenG2P's review of the previous registry:
 
 Derived and never typed: the land totals and land ownership, a land's area in
 hectares and whether its certificate is on file, the region to kebele names,
-the `*_ec` dates, the farmer's phone list (from the phone rows), the household
-head's name, and the enumerator details. The enumerator name and date come from
+the `*_ec` dates, the farmer's phone list (from the phone rows), and the
+enumerator details. A household's head is never derived from a farmer: it
+changes only through a change request on the household. The enumerator name and date come from
 the submission. The position comes from the enumerator's device, if the browser
 allows it. They are shown on the read-only Enumerator tab.
 
@@ -191,7 +192,7 @@ Each file runs after the whole farmer seed, in name order:
 
 | File | Does |
 |---|---|
-| `05_registers.sql` | the FarmerPhone and FarmerName registers, the location names in the farmer list, and Fayda verification for the Farmer register |
+| `05_registers.sql` | the FarmerPhone register, the location names in the farmer list, and Fayda verification for the Farmer register |
 | `10_sections.sql` | the table sections: each upstream one with OAN columns added, so upstream changes carry over on the next seed; the household link and the intake photo section |
 | `12_form_sections.sql` | the form sections as one row of three columns: which widget goes where, upstream's by `widget-id` and OAN's written out (personal identification, socio-economic, membership, household, location, documents) |
 | `15_sections.sql` | sections with no upstream counterpart: phones, land totals, enumerator |
@@ -213,8 +214,8 @@ name; these map:
 | Previous field | Gen2 |
 |---|---|
 | `given_name`, `family_name`, `gf_name_eng` | `first_name`, `middle_name`, `last_name` |
-| `*_amh` (Gen1 `first_name_amh`, `family_name_amh`, `gf_name_amh`) | `first_name_amh`, `middle_name_amh`, `last_name_amh` |
-| `*_other`; COSS `*_om` (Afaan Oromo) | a FarmerName row: `language` from the record's language (`AFAAN_OROMO` for `*_om`), `first_name`, `middle_name`, `last_name` |
+| Gen1 `first_name_amh`, `family_name_amh`, `gf_name_amh` | `first_name_local`, `middle_name_local`, `last_name_local`, with `language_spoken` = `AMHARIC` |
+| COSS `*_om` (Afaan Oromo) | `*_local`, with `language_spoken` = `AFAAN_OROMO` |
 | `birthdate_ec`, `collected_ec`, `expiry_date_ec` | derived again from the Gregorian date (`*_ec`) |
 | `age` | `estimated_age` |
 | `is_disabled` | `disabled` |
@@ -249,3 +250,10 @@ household's members must pass the farmer extension's own roster rules (members
 entered, one head, relationship for the others, counts matching the household).
 It runs ahead of the farmer extension's finalize, which checks a household's
 own intake form the same way.
+
+A farmer answering Yes to Household Head never changes a household. A new
+household on the form takes the farmer as its head (filled in before approval,
+so the approver sees it); a registered household must already name the farmer
+as its head, with no other farmer of it marked head, both at submit and when a
+farmer change request is approved. The message names the change request to
+raise first.

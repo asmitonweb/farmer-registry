@@ -40,35 +40,23 @@ Messages are the English defaults.
 | --- | --- | --- | --- |
 | Household | optional; pick a registered household **or** leave empty and fill Household Information | UI | help text: "Pick the household if it is already registered. For a new household, leave this empty and fill in Household Information and Household Members below." |
 | Is Household Head | yes / no | UI, API | "Is Household Head: \"…\" is not one of the choices. Pick one from the list." |
+| Is Household Head = Yes, new household on the form | the household's head is the farmer: filled in from the farmer's names when empty, refused when it names someone else | API (submit) | "Household Head: the farmer is marked as the head, and the household information names … as its head. Enter … as the household's head, or answer No to Household Head" |
+| Is Household Head = Yes, registered household picked | that household already names the farmer as its head, and no other farmer of it is its head; a farmer form never changes a registered household | API (submit, change request approval) | "Household Head: the farmer is marked as the head of HH-…, whose registered head is …. A household's head changes only through a change request on that household: raise one on its Household Information making … the head, and submit this again once it is approved. Or answer No to Household Head" · "Household Head: … is already the head of HH-…. Raise a change request on …'s record answering No to Household Head, and submit this again once it is approved. Or answer No to Household Head" |
 
 ### Personal Information
 
 | Field | Rule | Where | Message |
 | --- | --- | --- | --- |
 | First Name (English), Grandfather's Name (English), Gender, Marital Status, Education Level | required | UI | upstream "required" under the field |
-| Birth Date | a real date, not in the future | UI (past-only picker), API | "Birth Date: the date is in the future. Enter the real birth date, today or earlier." · "Birth Date: \"1980-02-30\" is not a date. Pick the date from the calendar (DD/MM/YYYY)." |
+| Birth Date | a real date, not in the future; read-only once Fayda has verified the farmer | UI (past-only picker), API | "Birth Date: the date is in the future. Enter the real birth date, today or earlier." · "Birth Date: \"1980-02-30\" is not a date. Pick the date from the calendar (DD/MM/YYYY)." |
 | Birth Date (Ethiopian) | read-only, shown from the Birth Date as it is typed; stored on save | — | — |
 | Estimated Age | whole number 0–122; within a year of the Birth Date; disabled once a Birth Date is entered | UI, API | "Estimated Age: \"ten\" is not a whole number. Enter digits only, for example 12." · "Estimated Age: 130 is too large. Enter 122 or less." · "Estimated Age: does not match the Birth Date. Correct the age to within a year of the birth date, or clear one of the two." |
-| Names (Amharic) | Ethiopic script, ≤ 100 characters | UI, API | "First Name (Amharic): Use Ethiopic (Ge'ez) script." · "…: too long. Enter at most 100 characters." |
+| Farmer's Language | from the Master Data LANGUAGE list; needed when a name in the farmer's language is entered | UI, API | "Farmer's Language: the name is entered in the farmer's language, but no language is chosen. Choose the language it is written in" |
+| First / Father's / Grandfather's Name (Farmer's Language) | the same three names in the farmer's own language, ≤ 100 characters; Ge'ez script for Amharic and Tigrinya, any other script as typed; filled in and locked when Fayda holds them in Amharic, unlocked again when another language is chosen | UI, API | "First Name (own language): Amharic is written in Ethiopic (Ge'ez) script, and \"Almaz\" is not. Type the name in Ge'ez letters, or choose the farmer's language again" · "…: too long. Enter at most 100 characters." |
 | Has National ID, Is PSNP User, Is a Farmer | Yes or No (no "Not set") | UI, API | "Has National ID: answer Yes or No." |
 | Fayda ID (FIN / FAN) | 12-digit FIN or 16-digit FAN, kept as entered; not registered to another farmer | UI, API | "Fayda ID (FIN / FAN): Enter a 12-digit FIN or a 16-digit FAN, using digits only." · "Fayda ID (FIN / FAN): … is already registered to … Open that record instead of registering the farmer again; if the ID was mistyped, correct it." |
 | Fayda RID | 29 digits | UI, API | "Fayda RID: The Fayda RID has 29 digits. Enter all 29, numbers only, as printed on the registration slip." |
 | ODK Farmer ID, Pula ID | ≤ 64 | UI, API | "…: too long. Enter at most 64 characters." |
-
-### Names in Other Languages (table)
-
-One row per language besides English and Amharic, from the Master Data
-LANGUAGE list; Other takes the language's name. Names are kept in any script,
-as typed (only spacing is tidied), as OpenG2P advises for names.
-
-| Rule | Where | Message |
-| --- | --- | --- |
-| language on every row | API | "Language: a name row has no language. Choose the language the name is written in, or remove the row" |
-| not Amharic or English | API | "Language: Amharic names go in the Name section, not in Names in Other Languages. Enter them there and remove this row" |
-| Other has a language name | API | "Language Name: the row's language is Other. Enter the name of the language" |
-| first name on every row | API | "First Name: the Afaan Oromo name row has no first name. Enter it, or remove the row" |
-| one row per language | API | "Language: Afaan Oromo is listed twice. Keep one row for it and remove the other" |
-| names, language name ≤ 100 / 50 | UI | "…: too long. Enter at most 100 characters." |
 
 ### Photo
 

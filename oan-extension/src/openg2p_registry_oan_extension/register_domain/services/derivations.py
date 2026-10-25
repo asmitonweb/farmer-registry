@@ -4,7 +4,7 @@ validate_domain_attributes changes the records it is given. On the intake form
 those are the rows that are saved; a change request validates a copy, so
 pre_approve applies the same changes to the stored payload (as the farmer
 extension does for disability details). Values that depend on other records
-(a farmer's land totals, phones and household head) are refreshed after
+(a farmer's land totals and phones) are refreshed after
 approval and after ingestion.
 
 Dates are Gregorian everywhere they are entered; each register lists its dates
@@ -27,7 +27,7 @@ from openg2p_registry_farmer_extension.register_domain.services.domain_validatio
     is_blank,
     validation_error,
 )
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.orm.attributes import flag_modified
 
 from ..derived import (
@@ -37,6 +37,7 @@ from ..derived import (
     geo_names,
     hectares,
     land_rollup,
+    local_name_problems,
     normalize_phone,
 )
 
@@ -106,16 +107,18 @@ def _farmer_record(record: dict) -> None:
         record.update(geo_names(_json(record.get("geo_code_hierarchy_json"))))
     if "is_household_head" in record:
         record["is_household_head"] = as_bool(record.get("is_household_head"))
+    if problems := local_name_problems(record):
+        validation_error("; ".join(problems))
 
 
 async def refresh_farmer(session, farmer_id: str | None) -> None:
-    """Land totals, phone list, names in other languages and household head of
-    one farmer."""
+    """Land totals and phone list of one farmer, from its own approved rows.
+
+    The household head is the household's attribute and changes only through a
+    change request on the household (household_intake.py), never from here."""
     from ..models import (
         G2PRegisterFarmer,
-        G2PRegisterFarmerName,
         G2PRegisterFarmerPhone,
-        G2PRegisterHousehold,
         G2PRegisterLand,
     )
 
@@ -147,32 +150,6 @@ async def refresh_farmer(session, farmer_id: str | None) -> None:
         ]
         farmer.has_personal_phone = True
 
-    # The name rows are the source of other_language_names; core rebuilds the
-    # farmer's search_text from it when the farmer is saved.
-    names = (await session.execute(
-        select(G2PRegisterFarmerName.first_name, G2PRegisterFarmerName.middle_name, G2PRegisterFarmerName.last_name)
-        .where(G2PRegisterFarmerName.link_internal_record_id == farmer_id,
-               G2PRegisterFarmerName.record_status == "ACTIVE")
-        .order_by(G2PRegisterFarmerName.created_at)
-    )).all()
-    farmer.other_language_names = " ".join(
-        dict.fromkeys(part.strip() for row in names for part in row if part and part.strip())) or None
-
-    household = (await session.get(G2PRegisterHousehold, farmer.link_internal_record_id)
-                 if farmer.link_internal_record_id else None)
-    if household is not None:
-        name = (farmer.record_name or "").strip() or None
-        if farmer.is_household_head:
-            household.household_head = name
-            await session.execute(
-                update(G2PRegisterFarmer).where(
-                    G2PRegisterFarmer.link_internal_record_id == farmer.link_internal_record_id,
-                    G2PRegisterFarmer.internal_record_id != farmer_id,
-                    G2PRegisterFarmer.is_household_head.is_(True),
-                ).values(is_household_head=False))
-        elif name and (household.household_head or "").strip().casefold() == name.casefold():
-            household.household_head = None
-
 
 async def _phones_from_list(farmer, session) -> None:
     """Phone rows for an ingested farmer that brought only a phone list."""
@@ -203,6 +180,26 @@ async def _phones_from_list(farmer, session) -> None:
     await session.flush()
 
 
+async def check_household_heads(change_request, session) -> None:
+    """A farmer change request that makes the farmer a household's head is
+    approved only once that household names the farmer as its head."""
+    from ..models import G2PRegisterFarmer
+    from .household_intake import farmer_name, registered_household_head_problems
+
+    _, records = await _payload_records(change_request, session)
+    problems = []
+    for record in records:
+        if not as_bool(record.get("is_household_head")):
+            continue
+        farmer_id = record.get("internal_record_id") or change_request.internal_record_id
+        stored = await session.get(G2PRegisterFarmer, farmer_id) if farmer_id else None
+        merged = {**(stored.to_dict() if stored is not None else {}), **record, "internal_record_id": farmer_id}
+        problems += await registered_household_head_problems(
+            session, merged, merged.get("link_internal_record_id"), farmer_name(merged))
+    if problems:
+        validation_error("; ".join(problems))
+
+
 class FarmerDerivations(Derivations):
     ethiopic_dates = (("birth_date", "birth_date_ec"),)
 
@@ -216,6 +213,7 @@ class FarmerDerivations(Derivations):
 
     async def pre_approve(self, change_request, session):
         await self.derive_payload(change_request, session)
+        await check_household_heads(change_request, session)
         await super().pre_approve(change_request, session)
 
     async def post_approve(self, change_request, session):

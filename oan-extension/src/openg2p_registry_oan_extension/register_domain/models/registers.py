@@ -1,10 +1,8 @@
-"""OAN's own child registers of the farmer, laid out as the farmer extension's.
+"""OAN's own child register of the farmer, laid out as the farmer extension's.
 
-FarmerPhone and FarmerName are TABLE registers under the Farmer
-(meta_data/05_registers.sql): a farmer has any number of phone numbers, and
-the name in any number of languages besides English and Amharic (OpenG2P's
-pattern for an open-ended set of languages). On the intake form a row is
-linked to the farmer of the same submission. The farmer's identifiers are attributes of
+FarmerPhone is a TABLE register under the Farmer (meta_data/05_registers.sql):
+a farmer has any number of phone numbers. On the intake form a row is linked to
+the farmer of the same submission. The farmer's identifiers are attributes of
 the farmer itself (fields.py), not a table.
 """
 
@@ -16,10 +14,7 @@ from openg2p_registry_farmer_extension.register_domain.models.farmer import (
 from sqlalchemy import Boolean, String, select
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ..services import (
-    G2PRegisterDomainServiceFarmerName,
-    G2PRegisterDomainServiceFarmerPhone,
-)
+from ..services import G2PRegisterDomainServiceFarmerPhone
 
 
 async def _link_to_submission_farmer(row, session) -> None:
@@ -64,38 +59,3 @@ class G2PIntakeFormFarmerPhone(G2PIntakeForm, G2PRegister, G2PFarmerPhone):
 
     def get_record_name_fields(self) -> str:
         return G2PRegisterDomainServiceFarmerPhone().construct_record_name(self.to_dict())
-
-
-class G2PFarmerName:
-    language: Mapped[str] = mapped_column(String, nullable=True)  # LANGUAGE list
-    language_name: Mapped[str] = mapped_column(String, nullable=True)  # when language is OTHER
-    first_name: Mapped[str] = mapped_column(String, nullable=True)
-    middle_name: Mapped[str] = mapped_column(String, nullable=True)  # the father's name
-    last_name: Mapped[str] = mapped_column(String, nullable=True)  # the grandfather's name
-
-
-class G2PRegisterFarmerName(G2PRegister, G2PFarmerName):
-    __tablename__ = "g2p_register_farmer_names"
-
-    def get_search_text_fields(self) -> str:
-        return G2PRegisterDomainServiceFarmerName().construct_search_text(self.to_dict())
-
-    def get_record_name_fields(self) -> str:
-        return G2PRegisterDomainServiceFarmerName().construct_record_name(self.to_dict())
-
-
-class G2PRegisterHistoryFarmerName(G2PRegisterHistory, G2PFarmerName):
-    __tablename__ = "g2p_register_history_farmer_names"
-
-
-class G2PIntakeFormFarmerName(G2PIntakeForm, G2PRegister, G2PFarmerName):
-    __tablename__ = "g2p_intake_form_farmer_names"
-
-    async def get_link_internal_record_id(self, session):
-        await _link_to_submission_farmer(self, session)
-
-    def get_search_text_fields(self) -> str:
-        return G2PRegisterDomainServiceFarmerName().construct_search_text(self.to_dict())
-
-    def get_record_name_fields(self) -> str:
-        return G2PRegisterDomainServiceFarmerName().construct_record_name(self.to_dict())

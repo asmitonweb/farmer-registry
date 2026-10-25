@@ -31,12 +31,31 @@ def test_default_mapping_splits_the_three_names_and_codes_the_rest():
         "first_name": "Abebe",
         "middle_name": "Kebede",
         "last_name": "Tesfaye",
-        "first_name_amh": "አበበ",
-        "middle_name_amh": "ከበደ",
-        "last_name_amh": "ተስፋዬ",
+        "first_name_local": "አበበ",
+        "middle_name_local": "ከበደ",
+        "last_name_local": "ተስፋዬ",
         "gender": "MALE",
         "birth_date": "1987-05-12",
     }
+
+
+def test_fayda_amharic_name_is_the_farmers_name_when_their_language_is_amharic_or_unset():
+    values = claims.map_claims(MOCK_PERSON)
+    for language in (None, "", "AMHARIC"):
+        local = claims.local_name_values(values, language)
+        assert local["first_name_local"] == "አበበ"
+        assert local["language_spoken"] == "AMHARIC" and local["local_name_from_fayda"] is True
+
+
+def test_fayda_amharic_name_is_left_out_for_another_language():
+    local = claims.local_name_values(claims.map_claims(MOCK_PERSON), "AFAAN_OROMO")
+    assert not {"first_name_local", "language_spoken", "local_name_from_fayda"} & set(local)
+    assert local["first_name"] == "Abebe"
+
+
+def test_no_amharic_claim_sets_no_language():
+    local = claims.local_name_values({"first_name": "Abebe"}, None)
+    assert local == {"first_name": "Abebe"}
 
 
 def test_a_missing_claim_or_name_part_is_left_for_the_staff():

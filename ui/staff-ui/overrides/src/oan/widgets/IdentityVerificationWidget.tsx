@@ -68,7 +68,11 @@ function popupFeatures(width: number, height: number): string {
  *   widget-data-path: {verificationId, status, verifiedOn, expiresOn}  (data paths)
  *   widget-data-options: {registerId, foundationalIdPath, internalRecordIdPath,
  *                         fieldPrefix (the register's data path prefix),
- *                         popupWidth, popupHeight}
+ *                         popupWidth, popupHeight, languagePath}
+ *
+ * languagePath: the farmer's own language, sent with the result so the server
+ * gives Fayda's Amharic name as their name only when it is that language
+ * (LocalNameWidget keeps it in step afterwards).
  *
  * The status and the Verify button go in the section's footer, before
  * Previous and Next, and any message in the footer's free space on the left,
@@ -111,6 +115,8 @@ export function IdentityVerificationWidget({ config }: { config: Config }) {
     );
 
     const fin = String(read(options.foundationalIdPath) ?? '').trim();
+    // The farmer's own language: Fayda's Amharic name is their name only in it.
+    const language = options.languagePath ? (read(options.languagePath) as string | undefined) : undefined;
     const savedStatus = read(paths.status) as string | undefined;
     const savedOn = read(paths.verifiedOn) as string | undefined;
 
@@ -188,7 +194,8 @@ export function IdentityVerificationWidget({ config }: { config: Config }) {
                 let result: Result | null;
                 try {
                     result = await dataSourceRequestHandler!(
-                        'oan', 'identity-verification/result', 'POST', { verification_id: verificationId },
+                        'oan', 'identity-verification/result', 'POST',
+                        { verification_id: verificationId, language: language || null },
                     );
                 } catch {
                     stop();
@@ -215,8 +222,9 @@ export function IdentityVerificationWidget({ config }: { config: Config }) {
                 poll(verificationId, startedAt, closed);
             }, POLL_MS);
         },
-        [apply, dataSourceRequestHandler, say, stop],
+        [apply, dataSourceRequestHandler, language, say, stop],
     );
+
 
     const verify = useCallback(async () => {
         setProblem(null);

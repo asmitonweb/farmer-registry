@@ -23,13 +23,13 @@ OAN_FIELDS: dict[str, dict[str, tuple]] = {
     "Farmer": {
         # An Ethiopian name is the person's, the father's and the grandfather's
         # name, which upstream's first, middle and last name hold in English.
-        # The same three names in Amharic, as Fayda has them. Names in any
-        # other language are FarmerName rows (models/registers.py).
-        "first_name_amh": (String, str),
-        "middle_name_amh": (String, str),
-        "last_name_amh": (String, str),
-        # The FarmerName rows' names, derived, so a farmer is found by them.
-        "other_language_names": (Text, str),
+        # The same three names in the farmer's own language (upstream's
+        # language_spoken), in its script. Fayda fills them in when that
+        # language is Amharic, and local_name_from_fayda then locks them.
+        "first_name_local": (String, str),
+        "middle_name_local": (String, str),
+        "last_name_local": (String, str),
+        "local_name_from_fayda": (Boolean, bool),
         # Productive Safety Net Programme beneficiary.
         "is_psnp_user": (Boolean, bool),
         # Ethiopian calendar twin of birth_date, derived from it.

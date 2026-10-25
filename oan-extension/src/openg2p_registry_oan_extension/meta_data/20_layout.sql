@@ -34,8 +34,7 @@ ON CONFLICT ("tab_section_id") DO UPDATE SET
   "register_id" = EXCLUDED."register_id", "tab_id" = EXCLUDED."tab_id",
   "section_id" = EXCLUDED."section_id", "section_order" = EXCLUDED."section_order";
 
--- Split Personal Information into adjacent sections: identity, name, the
--- names in other languages, then personal details. The UI section-id
+-- Split Personal Information into three adjacent sections. The UI section-id
 -- is rewritten in 12_form_sections.sql because MultiSectionAccordionForms
 -- matches saves by UI section-id; copied upstream ids would collide.
 INSERT INTO "public"."g2p_register_ui_tab_sections" ("tab_section_id", "register_id", "tab_id", "section_id", "section_order")
@@ -43,8 +42,7 @@ SELECT v.tab_section_id, t.register_id, t.tab_id, v.section_id, t.section_order 
 FROM "public"."g2p_register_ui_tab_sections" t
 JOIN (VALUES
   ('oan_farmer_name_register', 'oan_farmer_name', 1),
-  ('oan_farmer_names_register', 'oan_farmer_names', 2),
-  ('oan_farmer_personal_details_register', 'oan_farmer_personal_details', 3)
+  ('oan_farmer_personal_details_register', 'oan_farmer_personal_details', 2)
 ) v(tab_section_id, section_id, order_offset) ON true
 JOIN "public"."g2p_register_sections" s ON s.section_id = v.section_id
 WHERE t.tab_id = 'farmer_farmer_tab'
@@ -79,8 +77,7 @@ SELECT v.tab_section_id, t.tab_id, v.section_id, t.section_order + v.order_offse
 FROM "public"."g2p_intake_form_ui_tab_sections" t
 JOIN (VALUES
   ('oan_farmer_name_intake', 'oan_farmer_name', 1),
-  ('oan_farmer_names_intake', 'oan_farmer_names', 2),
-  ('oan_farmer_personal_details_intake', 'oan_farmer_personal_details', 3)
+  ('oan_farmer_personal_details_intake', 'oan_farmer_personal_details', 2)
 ) v(tab_section_id, section_id, order_offset) ON true
 JOIN "public"."g2p_register_sections" s ON s.section_id = v.section_id
 WHERE t.tab_id = 'a1a4d25a-1cd4-4356-abac-72482721'
@@ -100,7 +97,7 @@ ON CONFLICT ("tab_id") DO UPDATE SET
 INSERT INTO "public"."g2p_register_ui_tab_sections" ("tab_section_id", "register_id", "tab_id", "section_id", "section_order")
 SELECT v.tab_section_id, 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd', v.tab_id, v.section_id, v.section_order
 FROM (VALUES
-  ('oan_farmer_phones_tab_section', 'farmer_farmer_tab', 'oan_farmer_phones', 14),
+  ('oan_farmer_phones_tab_section', 'farmer_farmer_tab', 'oan_farmer_phones', 13),
   ('oan_farmer_land_summary_tab_section', 'farmer_land_tab', 'oan_farmer_land_summary', 5),
   ('oan_farmer_enumerator_tab_section', 'oan_farmer_enumerator_tab', 'oan_farmer_enumerator', 10)
 ) v(tab_section_id, tab_id, section_id, section_order)
@@ -180,3 +177,13 @@ FROM (VALUES ('oan_farmer_household_information_intake', 'oan_household_informat
 JOIN "public"."g2p_register_sections" s ON s.section_id = v.section_id
 ON CONFLICT ("tab_section_id") DO UPDATE SET
   "tab_id" = EXCLUDED."tab_id", "section_id" = EXCLUDED."section_id", "section_order" = EXCLUDED."section_order";
+
+-- Retired: the separate "names in other languages" section and its FarmerName
+-- register, replaced by the farmer's own-language name in the Name section.
+-- Seed upserts never delete, so a registry seeded with them drops them here,
+-- by id.
+DELETE FROM "public"."g2p_intake_form_ui_tab_sections" WHERE "tab_section_id" = 'oan_farmer_names_intake';
+DELETE FROM "public"."g2p_register_ui_tab_sections" WHERE "tab_section_id" = 'oan_farmer_names_register';
+DELETE FROM "public"."g2p_register_sections" WHERE "section_id" = 'oan_farmer_names';
+DELETE FROM "public"."g2p_register_schemas" WHERE "register_id" = 'd2a7c3e4-5b6f-4a8e-9c1d-2e3f4a5b6c7d';
+DELETE FROM "public"."g2p_register_definitions" WHERE "register_id" = 'd2a7c3e4-5b6f-4a8e-9c1d-2e3f4a5b6c7d';

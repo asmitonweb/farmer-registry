@@ -17,14 +17,16 @@ import re
 from typing import Any
 
 # An Ethiopian name is the person's, the father's and the grandfather's name, in
-# that order; eSignet gives it as one claim, in English and in Amharic.
+# that order; eSignet gives it as one claim, in English and in Amharic. The
+# Amharic one is the farmer's name in their own language when that is Amharic
+# (local_name_values).
 CLAIM_MAPPING: dict[str, Any] = {
     "first_name": {"claim": ["name#en", "name#eng", "name"], "part": 0},
     "middle_name": {"claim": ["name#en", "name#eng", "name"], "part": 1},
     "last_name": {"claim": ["name#en", "name#eng", "name"], "part": 2},
-    "first_name_amh": {"claim": ["name#am", "name#amh"], "part": 0},
-    "middle_name_amh": {"claim": ["name#am", "name#amh"], "part": 1},
-    "last_name_amh": {"claim": ["name#am", "name#amh"], "part": 2},
+    "first_name_local": {"claim": ["name#am", "name#amh"], "part": 0},
+    "middle_name_local": {"claim": ["name#am", "name#amh"], "part": 1},
+    "last_name_local": {"claim": ["name#am", "name#amh"], "part": 2},
     "gender": {"claim": ["gender#en", "gender#eng", "gender"],
                "values": {"male": "MALE", "m": "MALE", "female": "FEMALE", "f": "FEMALE"}},
     "birth_date": {"claim": "birthdate", "format": "date"},
@@ -68,6 +70,26 @@ def map_claims(claims: dict, mapping: dict | None = None) -> dict:
         value = None if raw is None else _apply(raw, spec)
         if value not in (None, ""):
             values[field] = value
+    return values
+
+
+# The farmer's name in their own language, and the language Fayda gives it in.
+LOCAL_NAME_FIELDS = ("first_name_local", "middle_name_local", "last_name_local")
+LOCAL_NAME_LANGUAGE = "AMHARIC"
+
+
+def local_name_values(values: dict, language) -> dict:
+    """The verified values for a farmer whose own language is ``language``.
+
+    Fayda's Amharic name is the farmer's own-language name when that language
+    is Amharic or not chosen yet; it then sets the language and marks the
+    names as Fayda's. For any other language the staff enter the name, so
+    Fayda's Amharic one is left out.
+    """
+    values = dict(values)
+    local = {f: values.pop(f) for f in LOCAL_NAME_FIELDS if f in values}
+    if local and (language in (None, "") or language == LOCAL_NAME_LANGUAGE):
+        values.update(local, language_spoken=LOCAL_NAME_LANGUAGE, local_name_from_fayda=True)
     return values
 
 
