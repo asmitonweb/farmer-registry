@@ -1,9 +1,0 @@
-version: 1
-name: master-data-malformed
-slug: master-data-malformed
-protocol: http
-interceptRequests: true
-scenarios:
-  - name: default
-    path: ../master-data/malformed.js
-    default: true

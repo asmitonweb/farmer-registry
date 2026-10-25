@@ -75,6 +75,7 @@ def test_code_choices_share_one_catalog_for_all_rows():
     )
     assert len(calls) == 1
     assert calls[0][0] == "/attributes/get_attribute_values"
+    assert calls[0][1]["payload"] == {"attribute_id": "GENDER"}
     assert asyncio.run(
         validation.check_attribute_values([{"gender": "male"}], rules(), say, post)
     ) == ['Gender: "male" is not one of the choices. Pick one from the list.']
@@ -98,6 +99,57 @@ def test_id_bound_field_accepts_id_and_refuses_code():
     assert asyncio.run(
         validation.check_attribute_values([{"breed": "LOCAL"}], rule, say, post)
     ) == ['Breed: "LOCAL" is not one of the choices. Pick one from the list.']
+
+
+def test_fetches_each_submitted_attribute_once_and_skips_unused_lists():
+    calls = []
+    field_rules = (
+        rules()
+        | rules("value_id", "breed", "LIVESTOCK_BREED")
+        | rules("value_code", "language", "LANGUAGE")
+    )
+
+    async def post(path, *, payload, pagination):
+        calls.append(payload["attribute_id"])
+        return [
+            {
+                "attribute_id": payload["attribute_id"],
+                "value_code": "MALE",
+                "value_id": 42,
+            }
+        ]
+
+    assert (
+        asyncio.run(
+            validation.check_attribute_values(
+                [{"gender": "MALE", "breed": "42"}] * 4, field_rules, say, post
+            )
+        )
+        == []
+    )
+    assert calls == ["GENDER", "LIVESTOCK_BREED"]
+
+
+def test_pages_only_the_requested_attribute():
+    calls = []
+
+    async def post(path, *, payload, pagination):
+        calls.append((payload["attribute_id"], pagination["current_page"]))
+        if pagination["current_page"] == 1:
+            return [
+                {"attribute_id": "GENDER", "value_code": "MALE", "value_id": 10}
+            ] * 1000
+        return [{"attribute_id": "GENDER", "value_code": "FEMALE", "value_id": 11}]
+
+    assert (
+        asyncio.run(
+            validation.check_attribute_values(
+                [{"gender": "FEMALE"}], rules(), say, post
+            )
+        )
+        == []
+    )
+    assert calls == [("GENDER", 1), ("GENDER", 2)]
 
 
 @pytest.mark.parametrize(

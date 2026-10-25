@@ -26,33 +26,47 @@ async def check_attribute_values(records, field_rules, say, post):
     try:
         if post is None:
             raise RuntimeError("Master Data client is not registered")
-        # The same native endpoint, envelope, authentication and paging as the
-        # platform client; keep both keys because existing fields store either.
-        for page in range(1, 201):
-            payload = await post(
-                "/attributes/get_attribute_values",
-                payload={"attribute_id": None},
-                pagination={"current_page": page, "page_size": 1000},
-            )
-            rows = (
-                payload.get("attribute_values")
-                if isinstance(payload, dict)
-                else payload
-            )
-            if not isinstance(rows, list):
-                raise TypeError("Invalid Master Data response")
-            for row in rows:
-                if not isinstance(row, dict) or not row.get("attribute_id"):
-                    raise ValueError("Invalid Master Data attribute row")
-                choices = catalog.setdefault(row["attribute_id"], {})
-                for key in ("value_code", "value_id"):
-                    value = row.get(key)
-                    if value is not None and not isinstance(value, (dict, list, bool)):
-                        choices.setdefault(key, set()).add(str(value))
-            if len(rows) < 1000:
-                break
-        else:
-            raise ValueError("Master Data pagination limit exceeded")
+        # Only lists referenced by submitted nonblank fields are fetched. All
+        # fields/rows using the same list share its pages within this batch.
+        attributes = dict.fromkeys(
+            rule["master_data"]["attribute_id"] for _, rule, _ in pending
+        )
+        for attribute in attributes:
+            choices = catalog.setdefault(attribute, {})
+            for page in range(1, 201):
+                payload = await post(
+                    "/attributes/get_attribute_values",
+                    payload={"attribute_id": attribute},
+                    pagination={"current_page": page, "page_size": 1000},
+                )
+                rows = (
+                    payload.get("attribute_values")
+                    if isinstance(payload, dict)
+                    else payload
+                )
+                if not isinstance(rows, list):
+                    raise TypeError("Invalid Master Data response")
+                for row in rows:
+                    if not isinstance(row, dict) or not row.get("attribute_id"):
+                        raise ValueError("Invalid Master Data attribute row")
+                    if row["attribute_id"] != attribute:
+                        continue
+                    for key in ("value_code", "value_id"):
+                        value = row.get(key)
+                        if value is not None and not isinstance(
+                            value, (dict, list, bool)
+                        ):
+                            choices.setdefault(key, set()).add(str(value))
+                if len(rows) < 1000:
+                    break
+                if (
+                    isinstance(payload, dict)
+                    and isinstance(payload.get("total"), int)
+                    and page * 1000 >= payload["total"]
+                ):
+                    break
+            else:
+                raise ValueError("Master Data pagination limit exceeded")
     except Exception:  # noqa: BLE001 -- native transport errors must fail closed without leaking credentials
         # Never expose transport details or credentials in a field error.
         return [

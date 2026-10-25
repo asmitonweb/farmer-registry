@@ -16,8 +16,6 @@ BEGIN
         COALESCE(result->'widget-data-validation', '{}'::jsonb) ||
         jsonb_build_object('min', 1900, 'max', EXTRACT(YEAR FROM CURRENT_DATE)::integer));
     ELSIF COALESCE(node->>'column-key', node->>'widget-id') = 'collected_date' THEN
-      result := jsonb_set(result, '{widget-data-options}',
-        COALESCE(result->'widget-data-options', '{}'::jsonb) || '{"maxDate":"today"}'::jsonb);
       result := jsonb_set(result, '{widget-data-format}',
         COALESCE(result->'widget-data-format', '{}'::jsonb) || '{"dateConstraint":"past-only"}'::jsonb);
     END IF;

@@ -1,9 +1,0 @@
-version: 1
-name: master-data-unavailable
-slug: master-data-unavailable
-protocol: http
-interceptRequests: true
-scenarios:
-  - name: default
-    path: ../master-data/unavailable.js
-    default: true

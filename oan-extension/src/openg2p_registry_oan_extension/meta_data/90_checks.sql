@@ -237,8 +237,7 @@ BEGIN
     SELECT 1 FROM public.g2p_register_sections s,
       jsonb_path_query(s.section_ui_schema,
         'lax $.** ? (@."column-key" == "collected_date" || @."widget-id" == "collected_date")') w
-    WHERE (w #>> '{widget-data-options,maxDate}') IS DISTINCT FROM 'today'
-       OR (w #>> '{widget-data-format,dateConstraint}') IS DISTINCT FROM 'past-only'
+    WHERE (w #>> '{widget-data-format,dateConstraint}') IS DISTINCT FROM 'past-only'
   ) THEN
     RAISE EXCEPTION 'Livestock Count Date widgets must block future dates';
   END IF;
