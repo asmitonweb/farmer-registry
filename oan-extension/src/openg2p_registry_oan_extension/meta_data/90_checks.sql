@@ -194,9 +194,9 @@ BEGIN
     END IF;
   IF NOT EXISTS (
     SELECT 1 FROM "public"."g2p_register_definitions"
-    WHERE register_id = 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd' AND NOT requires_registrant_authentication
+    WHERE register_id = 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd' AND requires_registrant_authentication
   ) THEN
-    RAISE EXCEPTION 'Fayda verification must remain optional; approvals control registration';
+    RAISE EXCEPTION 'Fayda Verify must be enabled; this flag is not a finalize verification gate';
   END IF;
 
   IF EXISTS (
