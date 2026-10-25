@@ -1,6 +1,7 @@
 """The upstream calendar is vendored without edits until the platform ships it."""
 
 import hashlib
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -16,3 +17,29 @@ UPSTREAM_FILES = {
 def test_upstream_calendar_bytes_are_unchanged(path, digest):
     assert hashlib.sha256((OVERRIDES / path).read_bytes()).hexdigest() == digest
     assert digest in (OVERRIDES / "src/features/activity/UPSTREAM.md").read_text()
+
+
+def test_custom_table_date_keeps_server_date_validation():
+    rules_path = Path(__file__).parents[1] / (
+        "src/openg2p_registry_oan_extension/register_domain/services/widget_rules.py"
+    )
+    spec = importlib.util.spec_from_file_location("ec_widget_rules", rules_path)
+    rules_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rules_module)
+    columns = {
+        "widget": "table",
+        "widget-data-path": "member.records",
+        "widget-data-columns": [
+            {
+                "widget": "oan-ethiopian-date-input",
+                "column-key": "birth_date",
+                "widget-data-path": "birth_date",
+                "widget-required": True,
+            }
+        ],
+    }
+    rule = rules_module.collect_rules([("member", columns)])["member"]
+    assert rule["birth_date"]["type"] == "date"
+    assert rule["birth_date"]["required"] is True
+    assert rules_module.check_record({"birth_date": "2020-02-29"}, rule) == []
+    assert rules_module.check_record({"birth_date": "2020-02-30"}, rule)

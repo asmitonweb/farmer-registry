@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useBaseWidget, useWidgetContext, type BaseWidgetConfig } from '@openg2p/registry-widgets';
 import EthiopianDateInput from '@/features/activity/components/EthiopianDateInput';
 
@@ -12,6 +12,7 @@ type Props = { config: BaseWidgetConfig } & Partial<ReturnType<typeof useBaseWid
 /** Upstream calendar input with the registry's standard field/store contract. */
 export function EthiopianDateInputWidget(props: Props) {
     const { config } = props;
+    const [dateError, setDateError] = useState('');
     const base = useBaseWidget({ config });
     // WidgetRenderer's callback carries table-row edits back to TableWidget.
     const { value, error, touched, isEnabled, isRequired, isVisible, onChange, onBlur } = { ...base, ...props };
@@ -19,7 +20,7 @@ export function EthiopianDateInputWidget(props: Props) {
     const label = String(config['widget-label'] ?? '');
     const shownLabel = t ? t(label, { defaultValue: label }) : label;
     const disabled = !isEnabled || !!config['widget-readonly'];
-    const showError = touched && error.length > 0;
+    const showError = !!dateError || (touched && error.length > 0);
     const id = String(config['widget-id']);
 
     useEffect(() => {
@@ -55,10 +56,22 @@ export function EthiopianDateInputWidget(props: Props) {
                     <EthiopianDateInput
                         id={id}
                         value={typeof value === 'string' && value ? value.slice(0, 10) : undefined}
-                        onChange={(next) => onChange(next ?? null)}
+                        onChange={(next) => {
+                            // The calendar input has no constraints prop. Preserve the
+                            // metadata's existing past-only rule at the adapter boundary.
+                            const now = new Date();
+                            const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'),
+                                String(now.getDate()).padStart(2, '0')].join('-');
+                            if (next && config['widget-data-format']?.dateConstraint === 'past-only' && next > today) {
+                                setDateError(`${shownLabel}: ${t ? t('date_must_be_past', { defaultValue: 'Choose today or an earlier date.' }) : 'Choose today or an earlier date.'}`);
+                                return;
+                            }
+                            setDateError('');
+                            onChange(next ?? null);
+                        }}
                         disabled={disabled}
                     />
-                    {showError && <p id={`${id}-error`} className="owt-field-error text-sm mt-1">{error[0]}</p>}
+                    {showError && <p id={`${id}-error`} className="owt-field-error text-sm mt-1">{dateError || error[0]}</p>}
                 </fieldset>
             </div>
         </div>
