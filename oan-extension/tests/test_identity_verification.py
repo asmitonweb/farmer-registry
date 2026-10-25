@@ -148,3 +148,39 @@ def test_the_transaction_context_gets_the_fin_from_the_form():
     # Outside an OAN start, core's own context is untouched.
     iv._ContextStore(Store()).create(context={"foundational_id": "live"})
     assert created["context"] == {"foundational_id": "live"}
+
+
+def test_missing_verified_subject_is_refused():
+    service, session = _service(_auth(), subject=None)
+    problems = _check(service, [{"identity_verification_id": "v-1"}])
+    assert problems and "did not return a valid FIN" in problems[0]
+    assert not session.committed
+
+
+def test_existing_verification_cannot_be_removed_to_downgrade_the_record():
+    service, session = _service(_auth(internal_record_id="r-1"), stored={"r-1": {"identity_verification_id": "v-1"}})
+    problems = _check(service, [{"internal_record_id": "r-1", "identity_verification_id": ""}])
+    assert problems and "cannot be removed" in problems[0]
+    assert not session.committed
+
+
+def test_verified_fin_is_saved_without_changing_the_reference_uid():
+    service, _ = _service(_auth())
+    record = {"identity_verification_id": "v-1", "fayda_fan_id": "0012345678901234"}
+    assert _check(service, [record]) == []
+    assert record["foundational_id"] == FIN
+    assert record["fayda_fan_id"] == "0012345678901234"
+
+
+def test_stamps_without_a_verification_id_are_never_trusted():
+    service, _ = _service(_auth())
+    record = {"last_authentication_status": "SUCCESS"}
+    assert _check(service, [record]) == []
+    assert record["last_authentication_status"] is None
+
+
+def test_partial_save_uses_server_stamps_from_the_stored_verification():
+    service, _ = _service(_auth(internal_record_id="r-1"), stored={"r-1": {"identity_verification_id": "v-1"}})
+    record = {"internal_record_id": "r-1", "last_authentication_status": "FORGED"}
+    assert _check(service, [record]) == []
+    assert record["last_authentication_status"] == "SUCCESS"

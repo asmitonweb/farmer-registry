@@ -181,8 +181,16 @@ BEGIN
     WHERE section_id = 'oan_farmer_personal_identification'
       AND section_ui_schema::text LIKE '%"widget": "oan-identity-verification"%'
   ) THEN
-    RAISE EXCEPTION 'The Fayda verification widget is missing from the farmer Identity section';
+      RAISE EXCEPTION 'The Fayda verification widget is missing from the farmer Identity section';
   END IF;
+    IF EXISTS (
+      SELECT 1 FROM g2p_register_sections,
+        jsonb_path_query(section_ui_schema, 'lax $.** ? (@."widget-id" == "foundational_id")') w
+      WHERE section_id = 'oan_farmer_personal_identification'
+        AND (w->>'widget' <> 'display' OR w->>'widget-readonly' <> 'true')
+    ) THEN
+      RAISE EXCEPTION 'FIN must be entered only in the Fayda popup; the form can only display it';
+    END IF;
   IF NOT EXISTS (
     SELECT 1 FROM "public"."g2p_register_definitions"
     WHERE register_id = 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd' AND requires_registrant_authentication

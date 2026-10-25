@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { collectFaydaFin } from './faydaPopup';
 import {
     getValueByPath,
     setValueByPath,
@@ -34,7 +35,7 @@ const LABELS: Record<string, string> = {
     oan_idv_verified: 'Verified on {date}',
     oan_idv_failed: 'Not verified',
     oan_idv_filled: 'Filled in from Fayda: {fields}. These cannot be changed.',
-    oan_idv_no_fin: "Enter the farmer's Fayda ID (FIN) first, then verify.",
+    oan_idv_enter_fin: "Enter the farmer's Fayda ID (FIN) in this window to continue.",
     oan_idv_popup_blocked: 'The browser blocked the Fayda window. Allow pop-ups for this site and verify again.',
     oan_idv_closed: 'The Fayda window was closed before the sign-in finished. Verify again.',
     oan_idv_fin_changed: 'The FIN was changed after verification. Verify again with the new FIN.',
@@ -54,9 +55,9 @@ function popupFeatures(width: number, height: number): string {
  * Verifies the farmer with Fayda (eSignet) while the form is being filled in,
  * and fills in what Fayda verified.
  *
- * The FIN is its own field; this widget starts core's registrant
- * authentication for it (via /oan/identity-verification), opens the Fayda
- * sign-in in a pop-up and waits for the outcome. On success it puts the
+     * The FIN is collected in this verification window; this widget starts
+     * core's registrant authentication for it (via /oan/identity-verification),
+     * opens the Fayda sign-in in a pop-up and waits for the outcome. On success it puts the
  * verification and the verified values (names, gender, birth date, as the
  * provider's claim mapping gives them) on the form, so they are saved with
  * their sections. The server checks the verification on every save and
@@ -155,9 +156,17 @@ export function IdentityVerificationWidget({ config }: { config: Config }) {
                 // to it, just before that page closes, so the answer after a close
                 // is final.
                 const closed = !popup.current || popup.current.closed;
-                const result: Result | null = await dataSourceRequestHandler!(
-                    'oan', 'identity-verification/result', 'POST', { verification_id: verificationId },
-                );
+                let result: Result | null;
+                try {
+                    result = await dataSourceRequestHandler!(
+                        'oan', 'identity-verification/result', 'POST', { verification_id: verificationId },
+                    );
+                } catch {
+                    stop();
+                    setProblem(say('oan_idv_closed'));
+                    try { popup.current?.close(); } catch { /* already closed */ }
+                    return;
+                }
                 if (result && TERMINAL.has(result.status)) {
                     stop();
                     try { popup.current?.close(); } catch { /* already closed */ }
@@ -182,10 +191,6 @@ export function IdentityVerificationWidget({ config }: { config: Config }) {
 
     const verify = useCallback(async () => {
         setProblem(null);
-        if (!fin) {
-            setProblem(say('oan_idv_no_fin'));
-            return;
-        }
         // Open the window in the click, before the request, or it is blocked.
         const opened = window.open('', `${config['widget-id']}-fayda`, popupFeatures(
             Number(options.popupWidth ?? 1024), Number(options.popupHeight ?? 800)));
@@ -193,14 +198,42 @@ export function IdentityVerificationWidget({ config }: { config: Config }) {
             setProblem(say('oan_idv_popup_blocked'));
             return;
         }
-        opened.opener = null;
         popup.current = opened;
+
         setBusy(true);
-        const started = await dataSourceRequestHandler!('oan', 'identity-verification/start', 'POST', {
+        let verificationFin: string | null;
+        try {
+            verificationFin = await collectFaydaFin(opened, fin, say('oan_idv_enter_fin'));
+        } catch {
+            opened.close();
+            popup.current = null;
+            stop();
+            setProblem(say('oan_idv_closed'));
+            return;
+        }
+        if (!verificationFin) {
+            opened.close();
+            popup.current = null;
+            stop();
+            setProblem(say('oan_idv_closed'));
+            return;
+        }
+        opened.opener = null;
+        setBusy(true);
+        let started;
+        try {
+            started = await dataSourceRequestHandler!('oan', 'identity-verification/start', 'POST', {
             register_id: options.registerId,
-            foundational_id: fin,
+            foundational_id: verificationFin,
             internal_record_id: read(options.internalRecordIdPath) ?? null,
-        });
+            });
+        } catch {
+            opened.close();
+            popup.current = null;
+            stop();
+            setProblem(say('oan_idv_closed'));
+            return;
+        }
         if (!started?.authorization_url) {
             // The request handler has shown the server's message.
             opened.close();
@@ -208,9 +241,14 @@ export function IdentityVerificationWidget({ config }: { config: Config }) {
             setBusy(false);
             return;
         }
+        if (opened.closed) {
+            stop();
+            setProblem(say('oan_idv_closed'));
+            return;
+        }
         opened.location.href = started.authorization_url;
         poll(started.verification_id, Date.now());
-    }, [config, dataSourceRequestHandler, fin, options, poll, read, say]);
+    }, [config, dataSourceRequestHandler, fin, options, poll, read, say, stop]);
 
     const verified = savedStatus === 'SUCCESS';
     const finChanged = verified && verifiedFin !== null && verifiedFin !== fin;

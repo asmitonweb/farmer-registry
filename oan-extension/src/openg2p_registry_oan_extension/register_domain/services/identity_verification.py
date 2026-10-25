@@ -4,7 +4,7 @@ authentication.
 Core verifies a registrant who is already in the register: it reads the FIN
 from the live record and, after the eSignet sign-in, checks that the person who
 signed in has that FIN. A farmer being registered has no live record yet, so
-OAN starts core's flow with the FIN typed on the form (put into core's
+OAN starts core's flow with the FIN entered only in the popup (put into core's
 transaction context, which is what core checks the sign-in against). Core's
 callback, its checks, its g2p_registrant_authentications row and its provider
 configuration are used unchanged.
@@ -18,11 +18,14 @@ verified value (identity_claims.map_claims).
 
 import json
 import logging
+import re
 import uuid
 from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone
+from typing import TypedDict
 
 from cryptography.fernet import Fernet, InvalidToken
+from iam_core.schemas.auth_transaction import AuthTransaction
 from openg2p_fastapi_common.context import component_registry, dbengine
 from openg2p_registry_core.config import Settings
 from openg2p_registry_core.errors import G2PRegistryErrorCodes, G2PRegistryException
@@ -58,7 +61,12 @@ UNBOUND = "oan-unbound:"
 
 STAMPS = ("last_authentication_status", "last_authenticated_on", "authentication_expiry_date")
 
-_extra_context: ContextVar[dict | None] = ContextVar("oan_registrant_auth_context", default=None)
+class _StartContext(TypedDict, total=False):
+    context: dict[str, str]
+    transaction: AuthTransaction
+
+
+_extra_context: ContextVar[_StartContext | None] = ContextVar("oan_registrant_auth_context", default=None)
 
 
 class _ContextStore:
@@ -118,14 +126,16 @@ class OANRegistrantAuthenticationService(G2PRegistrantAuthenticationService):
     ) -> dict:
         foundational_id = (foundational_id or "").strip()
         if not foundational_id:
-            raise _invalid("FIN (Fayda ID): enter the farmer's FIN before verifying")
+            raise _invalid("FIN (Fayda ID): enter the farmer's FIN in the Fayda verification window")
+        if not re.fullmatch(r"[0-9]{12}", foundational_id):
+            raise _invalid("FIN (Fayda ID): enter all 12 digits in the Fayda verification window")
         providers = await self.get_available_providers(register_id=register_id)
         if not providers:
             raise _invalid(
                 "Fayda verification is not set up for this register. Ask the administrator to add an "
                 "active eSignet provider for it (g2p_registrant_authentication_providers)"
             )
-        extra = {"context": {"foundational_id": foundational_id}}
+        extra: _StartContext = {"context": {"foundational_id": foundational_id}}
         token = _extra_context.set(extra)
         try:
             _, authorization_url, provider_name = await self.start_authentication(
@@ -234,7 +244,10 @@ class OANRegistrantAuthenticationService(G2PRegistrantAuthenticationService):
                     "identity_verification_id"
                 )
                 if not verification_id:
-                    if carries_id:
+                    if (stored or {}).get("identity_verification_id"):
+                        problems.append("Fayda verification: an existing verification cannot be removed. Verify again to replace it")
+                        continue
+                    if carries_id or any(field in record for field in STAMPS):
                         record.update(dict.fromkeys(STAMPS))
                     continue
                 try:
@@ -249,10 +262,13 @@ class OANRegistrantAuthenticationService(G2PRegistrantAuthenticationService):
                 subject, verified = self._verified(auth, provider)
                 merged = {**(stored or {}), **record}
                 fin = merged.get("foundational_id")
-                if subject and fin and str(fin).strip() != str(subject).strip():
+                if not subject or not re.fullmatch(r"[0-9]{12}", str(subject)):
+                    problems.append("FIN (Fayda ID): Fayda did not return a valid FIN. Verify again or contact support")
+                    continue
+                if fin and str(fin).strip() != str(subject).strip():
                     problems.append(
                         f"{labels.get('foundational_id', 'FIN')}: the farmer was verified with Fayda under another FIN. "
-                        "Enter the verified FIN, or verify the farmer again with this one"
+                        "Verify the farmer again in the Fayda window"
                     )
                 for field, value in verified.items():
                     if field in record and not same_value(record[field], value):
@@ -260,6 +276,11 @@ class OANRegistrantAuthenticationService(G2PRegistrantAuthenticationService):
                             f"{labels.get(field, field)}: Fayda verified it as \"{value}\" and it cannot be changed. "
                             "Undo the change; if the farmer's Fayda record is wrong, it has to be corrected there"
                         )
+                record.update(
+                    last_authentication_status=status,
+                    last_authenticated_on=_day(auth.completed_at),
+                    authentication_expiry_date=_day(auth.expiry_at),
+                )
                 if not carries_id:
                     continue
                 if auth.internal_record_id != record_id:
@@ -276,6 +297,7 @@ class OANRegistrantAuthenticationService(G2PRegistrantAuthenticationService):
                     auth.internal_record_id = record_id
                     session.add(auth)
                 record.update(
+                    foundational_id=subject,
                     last_authentication_status=status,
                     last_authenticated_on=_day(auth.completed_at),
                     authentication_expiry_date=_day(auth.expiry_at),
