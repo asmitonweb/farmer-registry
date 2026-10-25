@@ -76,11 +76,11 @@ class OANIntakeFormDataService(G2PFarmerIntakeFormDataService):
         submission = await self._get_submission_or_error(submission_id, session)
         register_definition = await self._get_register_definition(submission.register_id, session)
         if getattr(register_definition, "register_mnemonic", None) == FARMER_REGISTER_MNEMONIC:
-            await check_farmer_submission(submission.submission_id, session)
+            await check_farmer_submission(submission.submission_id, session, submission=submission)
         return await super().finalize_submission_with_session(submission_id, session, *args, **kwargs)
 
 
-async def check_farmer_submission(submission_id: str, session) -> None:
+async def check_farmer_submission(submission_id: str, session, submission=None) -> None:
     # Lazy: the models import the services package when they load.
     from openg2p_registry_extensions.register_domain.models import (
         G2PIntakeFormFarmer,
@@ -98,6 +98,21 @@ async def check_farmer_submission(submission_id: str, session) -> None:
     households = await rows(G2PIntakeFormHousehold)
     members = await rows(G2PIntakeFormHouseholdMember)
     _, _, messages = await _load()
+    if submission is not None:
+        # Every section of the form, then the Fayda ID against other farmers
+        # (form_integrity.py), in one message.
+        from .form_integrity import check_fayda_id_unique, check_form_complete
+        from .widget_rules import _Say
+
+        farmer = farmers[0] if farmers else None
+        problems = await check_form_complete(submission, submission.register_id, farmer, session, messages)
+        if farmer is not None:
+            label = _Say(messages).label("foundational_id", "foundational_id")
+            held = await check_fayda_id_unique(farmer, label, session, messages, submission_id=submission_id)
+            if held:
+                problems.append(held)
+        if problems:
+            validation_error("; ".join(problems))
     async with _reworded(messages):
         check_farmer_household(farmers, households[0] if households else None, members, messages)
 

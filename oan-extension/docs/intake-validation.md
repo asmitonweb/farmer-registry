@@ -15,7 +15,9 @@ message a user gets. The rule this document holds the form to:
 | Staff UI (OAN widgets) | file type and size, photo type and size, slots per document category, map pin inside Ethiopia | `ui/staff-ui/overrides/src/oan/widgets/` | under the widget, `oan_file_*`, `oan_photo_*`, `oan_docs_*`, `oan_map_*` |
 | Server, OAN widget rules | the same metadata rules again, plus the value's **kind** (yes/no, whole number, number, date, static choice) and **required table columns** | `register_domain/services/widget_rules.py` | `oan_rule_*` keys, REQ-VAL-001 |
 | Server, farmer extension | domain rules (dates not in the future, age vs birth date, household roster, duplicates) | upstream `farmer-extension` (never changed) | reworded by `register_domain/services/upstream_messages.py`, `oan_up_*` keys, REQ-VAL-001 |
-| Server, registry core | file bytes against the documents profile | upstream core | core's own text (see [Files](#files-and-documents)) |
+| Server, OAN submit (whole form) | every section's required fields, evaluated with the UI's show/hide/require rules, including sections never opened; required document categories; the household (picked **or** new, roster) | `register_domain/services/form_integrity.py`, `household_intake.py` | one list, `<Section>: <Field> is required. Open <Section>, fill it in and save, then submit again.` (`oan_form_*`, `oan_household_*`) |
+| Server, OAN Fayda ID | the FIN/FAN is not held by another register record or by another submitted form waiting for approval (section save, change request, submit) | `register_domain/services/form_integrity.py` | `oan_fin_registered`, `oan_fin_pending`: names the holder and the record |
+| Server, registry core | file bytes against the documents profile; MDS codes (`REGISTRY_CORE_VALIDATE_ATTRIBUTE_VALUES`) | upstream core | core's own text for files (see [Files](#files-and-documents)); OAN wording for codes (`attribute_messages.py`) |
 
 The UI is the first line; the server repeats the value rules because an API
 client, an ODK import or a stale browser tab does not run the UI. Every server
@@ -194,12 +196,14 @@ validation path). ✔ = accepted, ✘ = rejected with the message shown above.
 
 | Item | Why it is open | Proposed fix |
 | --- | --- | --- |
-| Farmer finalize does not run the whole-household check | upstream runs it for household-form submissions only; the fix overrides the intake data service's finalize, which the eSignet intake-identity work also overrides | add the check to that shared override once it lands |
-| Picking a household **and** entering a new one | the link from the lookup wins; the new household row is left unattached | the same finalize check: reject "both" with "Household: you picked a registered household and also entered a new one. Clear one of them." |
-| Codes from Master Data lists (gender, kebele, …) are not checked by the server | the lists are served by Master Data per request; the UI only offers valid codes | check against the Master Data catalogue with a short cache |
-| Year of acquisition `max: 2026` is a fixed year | upstream metadata | make "not in the future" the rule (already enforced) and drop the fixed maximum |
-| Collected date (livestock) can be in the future | upstream metadata has no date constraint | add `dateConstraint: past-only` in OAN's livestock section |
 | Core's file messages are not reworded | core endpoint, no hook | UI is stricter, so only API clients see them |
+| The map pin is bounded to Ethiopia only in the browser | the server checks latitude/longitude ranges only | an Ethiopia bounding-box rule in `widget_rules.py` |
+
+Closed: the farmer's household at submit and "picked and new" (`household_intake.py`);
+Master Data codes (core's validator with OAN wording); acquisition-year and collected-date
+bounds (`16_value_bounds.sql`); required fields of unopened sections and duplicate Fayda IDs
+(`form_integrity.py`). Fayda verification is optional at submit by design: every change to a
+register goes through approval.
 
 ## Adding a rule
 

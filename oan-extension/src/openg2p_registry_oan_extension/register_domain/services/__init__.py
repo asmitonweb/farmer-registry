@@ -105,6 +105,15 @@ class WidgetRuleValidation:
             service = OANRegistrantAuthenticationService.get_component()
             if service:
                 problems = await service.verify_records(records, labels, self.register_mnemonic())
+            if not problems:
+                # The same Fayda ID on another farmer (form_integrity.py).
+                from .form_integrity import check_fayda_id_unique
+
+                async with async_sessionmaker(dbengine.get())() as session:
+                    for record in records:
+                        held = await check_fayda_id_unique(record, labels["foundational_id"], session, messages)
+                        if held:
+                            problems.append(held)
         if problems:
             validation_error("; ".join(dict.fromkeys(problems)))
 
