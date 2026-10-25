@@ -227,6 +227,15 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM public.g2p_register_sections s,
       jsonb_path_query(s.section_ui_schema,
+        'lax $.** ? (@.widget == "select")') w
+    WHERE w #>> '{widget-data-source,service}' = 'attributes'
+      AND w #>> '{widget-data-source,valueKey}' = 'value_id'
+  ) THEN
+    RAISE EXCEPTION 'MDS-backed selects must store value_code for the core validator';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.g2p_register_sections s,
+      jsonb_path_query(s.section_ui_schema,
         'lax $.** ? (@."column-key" == "year_of_acquisition" || @."widget-id" == "year_of_acquisition")') w
     WHERE (w #>> '{widget-data-validation,min}') IS DISTINCT FROM '1900'
        OR (w #>> '{widget-data-validation,max}') IS DISTINCT FROM EXTRACT(YEAR FROM CURRENT_DATE)::integer::text

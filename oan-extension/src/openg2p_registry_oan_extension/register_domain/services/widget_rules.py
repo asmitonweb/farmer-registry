@@ -51,7 +51,6 @@ MESSAGES = {
     "oan_rule_date": "{label}: \"{value}\" is not a date. Pick the date from the calendar (DD/MM/YYYY).",
     "oan_rule_option": "{label}: \"{value}\" is not one of the choices. Pick one from the list.",
     "oan_rule_required": "{label}: this is required. Fill it in on every row before saving.",
-    "oan_rule_mds_unavailable": "{label}: Master Data Service is unavailable or its list is not configured. Retry after the service is restored; contact support if this continues.",
     "oan_rule_year_range": "{label}: enter a whole year from 1900 to {year}, or leave it empty.",
     "oan_rule_future_date": "{label}: the date is in the future. Choose today or an earlier date.",
 }
@@ -134,12 +133,6 @@ def _add(rules: Rules, register_id: str, field: str | None, widget: dict, column
     options = _options(widget)
     if options:
         found["options"] = options
-    source = widget.get("widget-data-source") or {}
-    if widget.get("widget") == "select" and source.get("type") == "api" and source.get("service") == "attributes":
-        attribute = (source.get("params") or {}).get("attribute_id")
-        value_key = source.get("valueKey", "value_code")
-        if attribute:
-            found["master_data"] = {"attribute_id": attribute, "value_key": value_key}
     if column and widget.get("widget-required") is True and widget.get("widget") != "parent-lookup"             and not _conditional(widget):
         found["required"] = True
     if not found:

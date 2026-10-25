@@ -11,6 +11,13 @@ BEGIN
   ELSIF jsonb_typeof(node) = 'object' THEN
     SELECT COALESCE(jsonb_object_agg(key, pg_temp.oan_value_bounds(value)), '{}'::jsonb)
       INTO result FROM jsonb_each(node);
+    -- Core validates value_code. OAN's strings use that same contract for the
+    -- five inherited id-bound selects; no register records are rewritten here.
+    IF node->>'widget' = 'select'
+       AND node #>> '{widget-data-source,service}' = 'attributes'
+       AND node #>> '{widget-data-source,valueKey}' = 'value_id' THEN
+      result := jsonb_set(result, '{widget-data-source,valueKey}', '"value_code"'::jsonb);
+    END IF;
     IF COALESCE(node->>'column-key', node->>'widget-id') = 'year_of_acquisition' THEN
       result := jsonb_set(result, '{widget-data-validation}',
         COALESCE(result->'widget-data-validation', '{}'::jsonb) ||
