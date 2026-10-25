@@ -215,3 +215,12 @@ The widgets' `widget-data-validation` rules (pattern, length, range) are applied
 by every register's domain service after the farmer checks, read from the same
 section metadata (cached for five minutes), so a rule is written once.
 Whether a field is required stays with the UI and with the domain code.
+
+When a farmer's intake form is finalized, its household is checked as a whole
+(`services/household_intake.py`), since a section save sees one section only:
+the farmer either joins a household picked in the household lookup or brings a
+new one entered on the same form, never both and never neither, and a new
+household's members must pass the farmer extension's own roster rules (members
+entered, one head, relationship for the others, counts matching the household).
+It runs ahead of the farmer extension's finalize, which checks a household's
+own intake form the same way.

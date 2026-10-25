@@ -16,6 +16,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from .derivations import DERIVATIONS, Derivations
+from .household_intake import install_farmer_household_check  # noqa: F401
 from .identity_verification import (  # noqa: F401
     OANRegistrantAuthenticationService,
     install_identity_verification,
