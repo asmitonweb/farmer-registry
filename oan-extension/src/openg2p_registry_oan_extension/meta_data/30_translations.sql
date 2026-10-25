@@ -152,7 +152,19 @@ WITH oan (language_code, labels) AS (
     "oan_map_no_location": "Your location is not available.",
     "oan_map_latitude": "Latitude",
     "oan_map_longitude": "Longitude",
-    "oan_map_altitude": "Altitude (m)"
+    "oan_map_altitude": "Altitude (m)",
+    "identity_verification": "Fayda verification",
+    "oan_idv_verify": "Verify with Fayda",
+    "oan_idv_verify_again": "Verify again",
+    "oan_idv_waiting": "Waiting for the Fayda sign-in...",
+    "oan_idv_not_verified": "Not verified",
+    "oan_idv_verified": "Verified on {date}",
+    "oan_idv_failed": "Not verified",
+    "oan_idv_filled": "Filled in from Fayda: {fields}. These cannot be changed.",
+    "oan_idv_no_fin": "Enter the FIN first, then verify.",
+    "oan_idv_popup_blocked": "The browser blocked the Fayda window. Allow pop-ups for this site and verify again.",
+    "oan_idv_closed": "The Fayda window was closed before the sign-in finished. Verify again.",
+    "oan_idv_fin_changed": "The FIN was changed after verification. Verify again with the new FIN."
   }'::jsonb)
 )
 UPDATE "public"."registry_languages" l
