@@ -7,6 +7,7 @@ _config = Settings.get_config()
 
 from openg2p_fastapi_common.context import dbengine
 from openg2p_registry_farmer_extension.app import Initializer as FarmerInitializer
+from sqlalchemy import text
 
 # The farmer initializer migrates its mapped classes directly, so the OAN
 # columns must be appended to them before any migration runs.
@@ -68,5 +69,38 @@ class Initializer(FarmerInitializer):
             for classes in OAN_REGISTERS:
                 for cls in classes:
                     await cls.create_migrate()
+            await add_oan_columns()
 
         asyncio.run(migrate())
+
+
+async def add_oan_columns() -> None:
+    """Add the OAN fields (register_domain/fields.py) that an existing farmer table lacks.
+
+    create_all creates missing tables only, so a field added after a registry
+    was first migrated would otherwise be mapped but absent, and every query
+    of that register would fail. Columns are only added, never changed or
+    dropped.
+    """
+    from openg2p_registry_farmer_extension.register_domain import (
+        models as farmer_models,
+    )
+    from sqlalchemy import inspect as sa_inspect
+
+    from .register_domain.fields import OAN_FIELDS
+
+    engine = dbengine.get()
+    async with engine.begin() as conn:
+        for mnemonic, fields in OAN_FIELDS.items():
+            for prefix in ("G2PRegister", "G2PRegisterHistory", "G2PIntakeForm"):
+                table = getattr(farmer_models, f"{prefix}{mnemonic}").__table__
+                present = await conn.run_sync(
+                    lambda sconn, name=table.name: {c["name"] for c in sa_inspect(sconn).get_columns(name)}
+                    if sa_inspect(sconn).has_table(name) else None)
+                if present is None:
+                    continue
+                for name in fields:
+                    if name not in present:
+                        column_type = table.c[name].type.compile(dialect=engine.dialect)
+                        _logger.info("Adding column %s.%s", table.name, name)
+                        await conn.execute(text(f'ALTER TABLE "{table.name}" ADD COLUMN IF NOT EXISTS "{name}" {column_type}'))
