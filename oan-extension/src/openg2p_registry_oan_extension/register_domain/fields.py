@@ -89,6 +89,13 @@ OAN_FIELDS: dict[str, dict[str, tuple]] = {
         "representative_document_type": (String, str),
         "other_document_purpose": (String, str),
         "other_document_name": (String, str),
+        # Fayda (eSignet) verification during intake: the verification (core's
+        # g2p_registrant_authentications row) and its outcome, which the server
+        # sets from that row on save (services/identity_verification.py).
+        "identity_verification_id": (String, str),
+        "last_authentication_status": (String, str),  # core's SUCCESS / FAILURE
+        "last_authenticated_on": (Date, date),
+        "authentication_expiry_date": (Date, date),
     },
     "HouseholdMember": {
         "odk_member_id": (String, str),  # the ODK Member ID, as an attribute

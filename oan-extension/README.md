@@ -73,6 +73,7 @@ Besides the farmer photo, `ui/staff-ui/overrides/src/oan/widgets/` registers:
 | `oan-geo-point` | an OpenStreetMap map to pin a place, as ODK's map question does; saves latitude, longitude and altitude (device altitude, or the ground elevation at the pin from `elevationUrl`), and fills the location hierarchy from the pin |
 | `oan-enumerator-position` | renders nothing; records the device's position once, if allowed |
 | `file` with `"widget-variant": "oan-documents"` | a documents category with several files: the first of the category's file widgets lists them all; the others (`oan-document-slot`) render nothing |
+| `oan-identity-verification` | verifies the farmer with Fayda (eSignet) during intake and fills in what Fayda verified; see [Fayda verification](#fayda-verification-during-intake) |
 
 The map needs its tile and elevation hosts in the staff UI's CSP (`CSP_SRC_IMG`,
 `CSP_SRC_CONNECT`). The elevation lookup sends the pin's coordinates to that
@@ -104,13 +105,68 @@ file per file widget label, so a category is five upstream file widgets
 (`<category>_1` .. `_5`) shown as one list. A new file goes to the first free
 slot; a saved document keeps its slot, since it is stored under that label.
 
+### Fayda verification during intake
+
+The FIN is typed in Personal identification; **Verify with Fayda** opens the
+Fayda (eSignet) sign-in in a pop-up. When the farmer has signed in, the names,
+gender and birth date Fayda holds are filled in on the form and can no longer be
+changed. Test identities are picked in the pop-up (eSignet with the mock
+identity system), never on the form.
+
+It is core's registrant authentication, unchanged: the provider row, the
+`/registrant-auth/callback` that completes the sign-in, the check that the
+person who signed in has the FIN on the form (the eSignet `individual_id`), and
+the `g2p_registrant_authentications` row with the encrypted claims. OAN adds
+(`register_domain/services/identity_verification.py`):
+
+* starting it before the farmer has a record, with the FIN from the form
+  (`POST /oan/identity-verification/start`, staff from the session, permission
+  `register:authenticate`), and reading the outcome with the verified values
+  (`/oan/identity-verification/result`, only by the staff member who started it);
+* on every save of the farmer: the verification must have succeeded and not
+  expired, belong to this record (the first save ties it to the record) and to
+  the FIN on the form; a verified value cannot be changed; and the outcome
+  (`last_authentication_status`, `last_authenticated_on`,
+  `authentication_expiry_date`) is set from the verification, never from the form.
+
+Every refusal says what to do, for example *"The person who signed in with
+Fayda is not the FIN on this form. Check the FIN, or ask the farmer to sign in
+with their own Fayda ID, then verify again"*.
+
+**Deployment.** The Farmer register has `requires_registrant_authentication`
+(`05_registers.sql`). Each environment adds its eSignet client as a row in
+`g2p_registrant_authentication_providers` for the Farmer register (adapter
+`esignet`, `oauth_callback_url` = the staff API's `/registrant-auth/callback`,
+client id and private key, and `provider_config` with `scope`, `issuer`,
+`audiences`); these are environment secrets, not seed data. The eSignet client
+must request the `individual_id` claim. The staff API needs
+`registrant_auth_session_store_backend=redis` when it runs more than one worker,
+since the sign-in returns to whichever worker answers.
+
+`provider_config.claim_mapping` says which claim fills which field; without it
+the default in `register_domain/identity_claims.py` applies (full name in
+English and Amharic split into the three names, gender, birth date):
+
+```json
+{"first_name": {"claim": ["name#en", "name"], "part": 0},
+ "gender": {"claim": "gender", "values": {"male": "MALE", "female": "FEMALE"}},
+ "birth_date": {"claim": "birthdate", "format": "date"}}
+```
+
+The pinned platform (`1.2.2-rc.557`) calls `get_async_session_maker` in the
+registrant authentication service without importing it; the OAN service gives
+the module that name until a platform image does (a no-op then). Upstream's
+`IdAuthenticationWidget` opens its pop-up with `noopener`, so `window.open`
+returns `null` and it reports a blocked pop-up while the sign-in is open; OAN's
+widget opens the window without it and cuts the opener by hand.
+
 ## Metadata layer
 
 Each file runs after the whole farmer seed, in name order:
 
 | File | Does |
 |---|---|
-| `05_registers.sql` | the FarmerPhone register, and the location names in the farmer list |
+| `05_registers.sql` | the FarmerPhone register, the location names in the farmer list, and Fayda verification for the Farmer register |
 | `10_sections.sql` | the table sections: each upstream one with OAN columns added, so upstream changes carry over on the next seed; the household link and the intake photo section |
 | `12_form_sections.sql` | the form sections as one row of three columns: which widget goes where, upstream's by `widget-id` and OAN's written out (personal identification, socio-economic, membership, household, location, documents) |
 | `15_sections.sql` | sections with no upstream counterpart: phones, land totals, enumerator |
