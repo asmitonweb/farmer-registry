@@ -70,8 +70,38 @@ WITH sections (section_id, section_register_id, mnemonic, description, is_list, 
        {"panel-id": "oan_panel_enumerator_3", "panel-orientation": "vertical", "widgets": [
          {"widget": "number", "widget-id": "enumerator_altitude", "widget-type": "input", "widget-label": "enumerator_altitude",
           "widget-readonly": true, "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.enumerator_altitude"},
-         {"widget": "number", "widget-id": "enumerator_accuracy", "widget-type": "input", "widget-label": "enumerator_accuracy",
-          "widget-readonly": true, "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.enumerator_accuracy"}]}]}]}')
+          {"widget": "number", "widget-id": "enumerator_accuracy", "widget-type": "input", "widget-label": "enumerator_accuracy",
+           "widget-readonly": true, "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.enumerator_accuracy"}]}]}]}'),
+
+   ('oan_farmer_intake_identity', 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd', 'oan_fr_intake_identity', 'Identity verification', false, 0,
+    '{"section-id": "farmer_intake_identity", "section-title": "identity_verification", "section-editable": false,
+      "panels": [{"panel-id": "oan_panel_intake_identity", "panel-orientation": "vertical", "panels": [
+        {"panel-id": "oan_panel_intake_identity_main", "panel-orientation": "vertical", "widgets": [
+          {"widget": "id-authentication", "widget-variant": "oan-intake", "widget-id": "farmer_intake_identity",
+           "widget-type": "group", "widget-label": "identity_verification", "widget-readonly": true,
+           "widget-data-path": {
+             "contextId": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.intake_identity_context_id",
+             "evidenceReference": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.identity_evidence_reference",
+             "submissionId": "submission_id",
+             "first_name": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.first_name",
+             "middle_name": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.middle_name",
+             "last_name": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_name",
+             "birth_date": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.birth_date",
+             "gender": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.gender",
+             "foundational_id": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.foundational_id",
+             "first_name_amh": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.first_name_amh",
+             "middle_name_amh": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.middle_name_amh",
+             "last_name_amh": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_name_amh"
+           },
+           "widget-auth-config": {
+             "service": "registry", "providerId": "esignet", "providerName": "eSignet",
+             "registerId": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd",
+             "formId": "a1a4d25a-1cd4-4356-abac-8782382649",
+             "startEndpoint": "intake-auth/start", "statusEndpoint": "intake-auth/status",
+              "resetEndpoint": "intake-auth/reset", "mockVerifyEndpoint": "intake-auth/mock-verify",
+              "mode": "mock", "mockPageUrl": "https://oan.closedroominc.qzz.io/mock-fayda/",
+              "callbackOrigin": "http://farmer-registry.openg2p.localtest.me"
+            }}]}]}]}')
 )
 INSERT INTO "public"."g2p_register_sections" (
   "register_id", "section_id", "section_register_id", "is_core_section", "section_mnemonic",
@@ -86,3 +116,18 @@ ON CONFLICT ("section_id") DO UPDATE SET
   "section_mnemonic" = EXCLUDED."section_mnemonic", "section_description" = EXCLUDED."section_description",
   "is_list" = EXCLUDED."is_list", "section_weightage" = EXCLUDED."section_weightage",
   "section_ui_schema" = EXCLUDED."section_ui_schema";
+
+-- The intake verifier belongs in the Farmer personal-identification section.
+UPDATE "public"."g2p_register_sections"
+SET "section_ui_schema" = jsonb_set(
+  "section_ui_schema",
+  '{panels,0,panels,0,widgets}',
+  ("section_ui_schema" #> '{panels,0,panels,0,widgets}') || '[
+    {"widget":"id-authentication","widget-variant":"oan-intake","widget-id":"farmer_intake_identity","widget-type":"group","widget-label":"identity_verification","widget-readonly":false,
+     "widget-data-path":{"contextId":"a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.intake_identity_context_id","evidenceReference":"a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.identity_evidence_reference","submissionId":"submission_id","first_name":"a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.first_name","middle_name":"a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.middle_name","last_name":"a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_name","birth_date":"a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.birth_date","gender":"a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.gender","foundational_id":"a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.foundational_id","first_name_amh":"a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.first_name_amh","middle_name_amh":"a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.middle_name_amh","last_name_amh":"a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_name_amh"},
+     "widget-auth-config":{"service":"registry","providerId":"esignet","providerName":"eSignet","registerId":"a1a4d25a-1cd4-4356-abac-985a0b3c6bcd","formId":"a1a4d25a-1cd4-4356-abac-8782382649","startEndpoint":"intake-auth/start","statusEndpoint":"intake-auth/status","resetEndpoint":"intake-auth/reset","mockVerifyEndpoint":"intake-auth/mock-verify","mode":"mock","mockPageUrl":"https://oan.closedroominc.qzz.io/mock-fayda/","callbackOrigin":"http://farmer-registry.openg2p.localtest.me"}}
+  ]'::jsonb,
+  true
+)
+WHERE "section_id" = 'oan_farmer_personal_identification'
+  AND NOT jsonb_path_exists("section_ui_schema", 'lax $.** ? (@."widget-id" == "farmer_intake_identity")');

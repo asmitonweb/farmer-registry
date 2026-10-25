@@ -89,6 +89,11 @@ OAN_FIELDS: dict[str, dict[str, tuple]] = {
         "representative_document_type": (String, str),
         "other_document_purpose": (String, str),
         "other_document_name": (String, str),
+        # Server-linked identity proof. The context id is written to the draft
+        # by the intake widget; the evidence reference is copied into the
+        # approved Farmer record by normal register ingestion.
+        "intake_identity_context_id": (String, str),
+        "identity_evidence_reference": (String, str),
     },
     "HouseholdMember": {
         "odk_member_id": (String, str),  # the ODK Member ID, as an attribute

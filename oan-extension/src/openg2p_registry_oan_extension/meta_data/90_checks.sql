@@ -83,10 +83,20 @@ BEGIN
                ('oan_farmer_membership_details'), ('oan_farmer_lands'), ('oan_farmer_livestock_intake'),
                ('oan_farmer_farm_inputs_intake'), ('oan_farmer_photo'),
                ('oan_household_information'), ('oan_farmer_location'), ('oan_farmer_crops_intake'),
-               ('oan_farmer_phones'), ('oan_farmer_documents')) e(section_id)
+                ('oan_farmer_phones'), ('oan_farmer_documents')) e(section_id)
   WHERE NOT EXISTS (SELECT 1 FROM "public"."g2p_intake_form_ui_tab_sections" t WHERE t.section_id = e.section_id);
   IF missing IS NOT NULL THEN
     RAISE EXCEPTION 'OAN sections not on the intake form: %', missing;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM "public"."g2p_register_sections" s
+    WHERE s.section_id = 'oan_farmer_personal_identification'
+      AND jsonb_path_exists(s.section_ui_schema,
+            'lax $.** ? (@."widget-id" == $f)',
+            jsonb_build_object('f', 'farmer_intake_identity'))
+  ) THEN
+    RAISE EXCEPTION 'Farmer identity verification widget is not on the personal identification section';
   END IF;
 
   -- A section replaced by an OAN one must not show twice.

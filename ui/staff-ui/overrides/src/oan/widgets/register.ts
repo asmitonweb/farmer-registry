@@ -1,10 +1,11 @@
 import { createElement } from 'react';
-import { FileInputWidget, HeaderSectionWidget, widgetRegistry } from '@openg2p/registry-widgets';
+import { FileInputWidget, HeaderSectionWidget, IdAuthenticationWidget, widgetRegistry } from '@openg2p/registry-widgets';
 import { DOCUMENT_SLOT_VARIANT, DOCUMENTS_VARIANT, DocumentsWidget } from './DocumentsWidget';
 import { EnumeratorPositionWidget } from './EnumeratorPositionWidget';
 import { FileCellWidget } from './FileCellWidget';
 import { FARMER_PHOTO_VARIANT, FarmerPhotoWidget } from './FarmerPhotoWidget';
 import { GeoPointWidget } from './GeoPointWidget';
+import { IntakeIdentityWidget } from './IntakeIdentityWidget';
 
 // The widget package uploads a section's photo, and sets the field named by
 // the widget's "image" path (record_image_document_id), only for widgets of
@@ -34,6 +35,15 @@ function FileOrVariant(props: Props) {
 }
 
 widgetRegistry.register({ widget: 'file', component: FileOrVariant });
+
+function IdAuthenticationOrVariant(props: Props) {
+    if (props.config['widget-variant'] === 'oan-intake') {
+        return createElement(IntakeIdentityWidget, props as never);
+    }
+    return createElement(IdAuthenticationWidget, props as never);
+}
+
+widgetRegistry.register({ widget: 'id-authentication', component: IdAuthenticationOrVariant });
 
 // OAN's own widget types. A widget with an object "widget-data-path" saves
 // every field it names (sectionSnapshot.ts), so each of these saves its pair

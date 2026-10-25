@@ -15,6 +15,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from .derivations import DERIVATIONS, Derivations
+from .intake_form_data_service import install_oan_intake_service  # noqa: F401
+from .intake_identity import OANIntakeIdentityService  # noqa: F401
 from .registers import FarmerPhoneService
 from .widget_rules import Rules, check_record, collect_rules
 

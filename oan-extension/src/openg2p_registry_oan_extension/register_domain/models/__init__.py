@@ -6,6 +6,10 @@ from sqlalchemy.orm import mapped_column
 
 from ..derived import farmer_search_text
 from ..fields import OAN_FIELDS
+from .intake_identity import (  # noqa: F401  re-exported for migrations/services
+    OANIntakeIdentityAttempt,
+    OANIntakeIdentityContext,
+)
 from .registers import (  # noqa: F401  re-exported for core
     G2PIntakeFormFarmerPhone,
     G2PRegisterFarmerPhone,
