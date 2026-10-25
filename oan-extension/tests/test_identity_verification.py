@@ -7,7 +7,7 @@ run inside the staff API image and are skipped elsewhere:
 """
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -18,7 +18,7 @@ from openg2p_registry_oan_extension.register_domain.services import (
     identity_verification as iv,
 )
 
-NOW = datetime.now(timezone.utc).replace(tzinfo=None)
+NOW = datetime.now(UTC).replace(tzinfo=None)
 FIN = "123456789012"
 VERIFIED = {"first_name": "Abebe", "birth_date": "1987-05-12"}
 

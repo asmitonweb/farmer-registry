@@ -22,7 +22,7 @@ import logging
 import re
 import uuid
 from contextvars import ContextVar
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TypedDict
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -46,6 +46,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from ..identity_claims import explain_failure, map_claims, same_value
 from .identity_completion import ReplayAdapters, completion_context
+from .identity_token_timeout import TokenExchangeTimeout, token_timeout_seconds
 
 _config = Settings.get_config()
 _logger = logging.getLogger(_config.logging_default_logger_name)
@@ -87,7 +88,7 @@ class _ContextStore:
             extension_context = dict(extra["context"])
             # A live record can appear between the preliminary lookup and
             # core's lookup. Never erase its server-owned expected identity.
-            if native_context.get("foundational_id") and not extension_context.get("foundational_id"):
+            if native_context.get("foundational_id") and not extension_context.get("foundational_id") and not extension_context.get("oan_unverified_fallback"):
                 extension_context["foundational_id"] = native_context["foundational_id"]
                 extension_context["oan_bind_verified_fin"] = False
             kwargs["context"] = {**native_context, **extension_context}
@@ -111,7 +112,7 @@ def _invalid(message: str) -> G2PRegistryException:
 
 
 def _now() -> datetime:
-    return datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    return datetime.now(tz=UTC).replace(tzinfo=None)
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -145,6 +146,10 @@ class OANRegistrantAuthenticationService(G2PRegistrantAuthenticationService):
             if not isinstance(audience, str) or not audience.strip():
                 raise _invalid("Fayda provider: jwt_assertion_aud must be a nonblank canonical token URL. Ask the administrator to correct it")
             login.jwt_assertion_aud = audience.strip()
+        try:
+            login.oan_token_timeout_seconds = token_timeout_seconds(provider)
+        except ValueError as error:
+            raise _invalid(str(error)) from error
         return login
 
     @staticmethod
@@ -155,10 +160,12 @@ class OANRegistrantAuthenticationService(G2PRegistrantAuthenticationService):
         self, *, register_id: str, foundational_id: str | None = None, internal_record_id: str | None, staff_id: str
     ) -> dict:
         expected_fin = None
+        unverified_fallback = False
         if internal_record_id:
             async with self._session() as session:
                 stored = await self._stored(session, ("G2PRegisterFarmer", "G2PIntakeFormFarmer"), internal_record_id)
-                expected_fin = (stored or {}).get("foundational_id")
+                unverified_fallback = bool(stored) and stored.get("last_authentication_status") != "SUCCESS"
+                expected_fin = None if unverified_fallback else (stored or {}).get("foundational_id")
         if isinstance(expected_fin, str):
             expected_fin = expected_fin.strip() or None
         if expected_fin is not None and (not isinstance(expected_fin, str) or not re.fullmatch(r"[0-9]{12}", expected_fin)):
@@ -169,7 +176,7 @@ class OANRegistrantAuthenticationService(G2PRegistrantAuthenticationService):
                 "Fayda verification is not set up for this register. Ask the administrator to add an "
                 "active eSignet provider for it (g2p_registrant_authentication_providers)"
             )
-        extra: _StartContext = {"context": {"foundational_id": expected_fin or "", "oan_bind_verified_fin": not bool(expected_fin)}}
+        extra: _StartContext = {"context": {"foundational_id": expected_fin or "", "oan_bind_verified_fin": not bool(expected_fin), "oan_unverified_fallback": unverified_fallback}}
         token = _extra_context.set(extra)
         try:
             _, authorization_url, provider_name = await self.start_authentication(
@@ -228,8 +235,15 @@ class OANRegistrantAuthenticationService(G2PRegistrantAuthenticationService):
                             subject = adapter.registrant_subject(claims, login_provider=login)
                             if not isinstance(subject, str) or not re.fullmatch(r"[0-9]{12}", subject):
                                 return await self._mark_failure(session, auth, "FIN (Fayda ID): Fayda did not return a 12-digit FIN. Verify again or contact support")
+                            if auth.internal_record_id and not auth.internal_record_id.startswith(UNBOUND):
+                                saved = await self._stored(session, ("G2PRegisterFarmer", "G2PIntakeFormFarmer"), auth.internal_record_id)
+                                if saved and saved.get("last_authentication_status") == "SUCCESS" and saved.get("foundational_id") != subject:
+                                    return await self._mark_failure(session, auth, "FIN (Fayda ID): this record was verified under another FIN. Sign in with its verified identity")
                             transaction.context = {**context, "foundational_id": subject}
                             replay["token_response"] = response
+                        except TokenExchangeTimeout as error:
+                            _logger.exception("Fayda token exchange timed out")
+                            return await self._mark_failure(session, auth, str(error))
                         except Exception:
                             _logger.exception("Fayda verified-subject binding failed")
                             return await self._mark_failure(session, auth, "Fayda verification: identity validation failed. Verify again or ask the administrator to check the provider")
@@ -328,12 +342,17 @@ class OANRegistrantAuthenticationService(G2PRegistrantAuthenticationService):
                 verification_id = record.get("identity_verification_id") if carries_id else (stored or {}).get(
                     "identity_verification_id"
                 )
+                manual_id = record.get("foundational_id")
+                if manual_id not in (None, ""):
+                    if not isinstance(manual_id, str) or not re.fullmatch(r"(?:[0-9]{12}|[0-9]{16})", manual_id.strip()):
+                        problems.append("Fayda ID: enter a 12-digit FIN or a 16-digit FAN. Use digits only")
+                        continue
+                    record["foundational_id"] = manual_id.strip()
                 if not verification_id:
                     if (stored or {}).get("identity_verification_id"):
                         problems.append("Fayda verification: an existing verification cannot be removed. Verify again to replace it")
                         continue
-                    if carries_id or any(field in record for field in STAMPS):
-                        record.update(dict.fromkeys(STAMPS))
+                    record.update(dict.fromkeys(STAMPS))
                     continue
                 try:
                     auth, provider = await self._verification(session, verification_id)
@@ -341,6 +360,12 @@ class OANRegistrantAuthenticationService(G2PRegistrantAuthenticationService):
                     problems.append(error.message)
                     continue
                 status, message = self._state(auth)
+                if (status in ("FAILURE", "EXPIRED") and auth.status != AuthenticationStatusEnum.success.value
+                    and (stored or {}).get("last_authentication_status") != "SUCCESS"
+                    and (record.get("foundational_id") or (stored or {}).get("foundational_id"))):
+                    record["identity_verification_id"] = None
+                    record.update(dict.fromkeys(STAMPS))
+                    continue
                 if status != "SUCCESS":
                     problems.append(f"Fayda verification: {message or 'it is not complete. Finish the Fayda sign-in or verify again'}")
                     continue
@@ -350,7 +375,7 @@ class OANRegistrantAuthenticationService(G2PRegistrantAuthenticationService):
                 if not subject or not re.fullmatch(r"[0-9]{12}", str(subject)):
                     problems.append("FIN (Fayda ID): Fayda did not return a valid FIN. Verify again or contact support")
                     continue
-                if fin and str(fin).strip() != str(subject).strip():
+                if ("foundational_id" in record or fin) and str(fin or "").strip() != str(subject).strip():
                     problems.append(
                         f"{labels.get('foundational_id', 'FIN')}: the farmer was verified with Fayda under another FIN. "
                         "Verify the farmer again in the Fayda window"

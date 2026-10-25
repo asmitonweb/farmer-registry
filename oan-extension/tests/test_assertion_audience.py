@@ -5,7 +5,6 @@ import pytest
 pytest.importorskip("openg2p_registry_core")
 from iam_core.user_auth.helpers.client_assertion_helper import _jwt_payload
 from openg2p_registry_core.models import G2PRegistrantAuthenticationProvider
-
 from openg2p_registry_oan_extension.register_domain.services.identity_verification import (
     OANRegistrantAuthenticationService,
 )

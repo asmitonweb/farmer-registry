@@ -209,7 +209,7 @@ def test_reverify_uses_saved_fin_instead_of_browser_value():
     service._session = lambda: session
 
     async def stored(*args):
-        return {"foundational_id": FIN}
+        return {"foundational_id": FIN, "last_authentication_status": "SUCCESS"}
 
     async def providers(**kwargs):
         return [SimpleNamespace(provider_id="esignet")]

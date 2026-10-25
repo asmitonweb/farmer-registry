@@ -187,15 +187,16 @@ BEGIN
       SELECT 1 FROM g2p_register_sections,
         jsonb_path_query(section_ui_schema, 'lax $.** ? (@."widget-id" == "foundational_id")') w
       WHERE section_id = 'oan_farmer_personal_identification'
-        AND (w->>'widget' <> 'display' OR w->>'widget-readonly' <> 'true')
+        AND (w->>'widget' <> 'text' OR w->>'widget-readonly' <> 'false'
+          OR NOT jsonb_path_exists(w, 'lax $."widget-data-options".actions[*] ? (@.action == "disable" && @.condition.value == "SUCCESS")'))
     ) THEN
-      RAISE EXCEPTION 'FIN must be entered only in the Fayda popup; the form can only display it';
+      RAISE EXCEPTION 'Unverified FIN/FAN fallback must stay editable until SUCCESS';
     END IF;
   IF NOT EXISTS (
     SELECT 1 FROM "public"."g2p_register_definitions"
-    WHERE register_id = 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd' AND requires_registrant_authentication
+    WHERE register_id = 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd' AND NOT requires_registrant_authentication
   ) THEN
-    RAISE EXCEPTION 'The Farmer register does not require registrant authentication';
+    RAISE EXCEPTION 'Fayda verification must remain optional; approvals control registration';
   END IF;
 
   IF EXISTS (

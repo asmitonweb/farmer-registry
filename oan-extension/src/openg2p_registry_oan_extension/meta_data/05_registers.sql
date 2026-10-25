@@ -49,5 +49,5 @@ WHERE s."register_id" = 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd';
 -- (client id, keys, callback URL) is deployment data, in
 -- g2p_registrant_authentication_providers; see the README.
 UPDATE "public"."g2p_register_definitions"
-SET "requires_registrant_authentication" = true
+SET "requires_registrant_authentication" = false
 WHERE "register_id" = 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd';
