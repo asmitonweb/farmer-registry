@@ -70,11 +70,11 @@ function popupFeatures(width: number, height: number): string {
  *                         fieldPrefix (the register's data path prefix),
  *                         popupWidth, popupHeight}
  *
- * The status stays on the widget's row; the Verify button goes in the
- * section's footer, before Previous and Next, so the FIN can be typed and
- * saved either way and verifying is the section's own action. The layout has
- * no slot there, so the button is portalled into the footer of the section
- * this widget is in, and stays on the row when no footer is found.
+ * The status, the Verify button and any message go in the section's footer,
+ * before Previous and Next, so answering "Has National ID" does not add a row
+ * to the section, and the FIN can be typed or filled in by verifying. The
+ * layout has no slot there, so they are portalled into the footer of the
+ * section this widget is in, and shown as a row when no footer is found.
  */
 export function IdentityVerificationWidget({ config }: { config: Config }) {
     const dispatch = useDispatch();
@@ -230,6 +230,8 @@ export function IdentityVerificationWidget({ config }: { config: Config }) {
             started = await dataSourceRequestHandler!('oan', 'identity-verification/start', 'POST', {
             register_id: options.registerId,
             internal_record_id: read(options.internalRecordIdPath) ?? null,
+            // A FIN typed on the form: the sign-in must be that person's.
+            foundational_id: fin || null,
             });
         } catch {
             opened.close();
@@ -284,10 +286,48 @@ export function IdentityVerificationWidget({ config }: { config: Config }) {
             {say(verified ? 'oan_idv_verify_again' : 'oan_idv_verify')}
         </button>
     );
+    const messages = (
+        <>
+            {finChanged && <span className="text-xs" style={{ color: 'var(--owt-widget-error-color)' }}>{say('oan_idv_fin_changed')}</span>}
+            {problem && !busy && <span className="text-xs" style={{ color: 'var(--owt-widget-error-color)' }}>{problem}</span>}
+            {verified && filled.length > 0 && (
+                <span className="text-xs" style={{ color: 'var(--owt-color-text-muted)' }}>
+                    {say('oan_idv_filled', { fields: filled.map(fieldLabel).join(', ') })}
+                </span>
+            )}
+        </>
+    );
+    const statusLine = (
+        <span
+            role="status"
+            title={shownLabel}
+            className="inline-flex items-center gap-2 text-sm font-medium"
+            style={{ color: 'var(--owt-color-text)' }}
+        >
+            <span aria-hidden className="inline-block w-2 h-2 rounded-full" style={{ background: tone }} />
+            {status}
+        </span>
+    );
+
+    if (footer) {
+        return (
+            <div ref={root}>
+                {createPortal(
+                    <span className="inline-flex flex-col items-end gap-1 mr-auto sm:mr-0" style={{ maxWidth: '36rem' }}>
+                        <span className="inline-flex flex-wrap items-center justify-end gap-3">
+                            {statusLine}
+                            {button}
+                        </span>
+                        {messages}
+                    </span>,
+                    footer,
+                )}
+            </div>
+        );
+    }
 
     return (
         <div ref={root} className="mb-[10px]">
-            {button && footer && createPortal(button, footer)}
             <div className="flex flex-col sm:flex-row sm:items-start">
                 <label
                     className="flex items-baseline min-w-0 max-w-full owt-field-label text-base font-medium md:min-w-[120px] sm:pr-4 sm:pt-1 mb-1 sm:mb-0"
@@ -297,23 +337,10 @@ export function IdentityVerificationWidget({ config }: { config: Config }) {
                 </label>
                 <div className="flex-1 min-w-0 flex flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-3">
-                        <span
-                            role="status"
-                            className="inline-flex items-center gap-2 text-sm font-medium"
-                            style={{ color: 'var(--owt-color-text)' }}
-                        >
-                            <span aria-hidden className="inline-block w-2 h-2 rounded-full" style={{ background: tone }} />
-                            {status}
-                        </span>
-                        {button && !footer && button}
+                        {statusLine}
+                        {button}
                     </div>
-                    {finChanged && <span className="text-xs" style={{ color: 'var(--owt-widget-error-color)' }}>{say('oan_idv_fin_changed')}</span>}
-                    {problem && !busy && <span className="text-xs" style={{ color: 'var(--owt-widget-error-color)' }}>{problem}</span>}
-                    {verified && filled.length > 0 && (
-                        <span className="text-xs" style={{ color: 'var(--owt-color-text-muted)' }}>
-                            {say('oan_idv_filled', { fields: filled.map(fieldLabel).join(', ') })}
-                        </span>
-                    )}
+                    {messages}
                 </div>
             </div>
         </div>

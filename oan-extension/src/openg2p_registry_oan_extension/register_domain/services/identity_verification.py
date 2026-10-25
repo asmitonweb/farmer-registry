@@ -176,7 +176,13 @@ class OANRegistrantAuthenticationService(G2PRegistrantAuthenticationService):
                 "Fayda verification is not set up for this register. Ask the administrator to add an "
                 "active eSignet provider for it (g2p_registrant_authentication_providers)"
             )
-        extra: _StartContext = {"context": {"foundational_id": expected_fin or "", "oan_bind_verified_fin": not bool(expected_fin), "oan_unverified_fallback": unverified_fallback}}
+        # A FIN typed on the form and not saved yet: the sign-in must be that
+        # person's. Without one, Fayda's FIN is filled in (a FAN cannot be
+        # compared with the FIN Fayda returns, so it is not held to it).
+        typed = foundational_id.strip() if isinstance(foundational_id, str) else ""
+        form_fin = typed if re.fullmatch(r"[0-9]{12}", typed) else None
+        extra: _StartContext = {"context": {"foundational_id": expected_fin or "", "oan_bind_verified_fin": not bool(expected_fin),
+                                            "oan_unverified_fallback": unverified_fallback, "oan_form_fin": form_fin}}
         token = _extra_context.set(extra)
         try:
             _, authorization_url, provider_name = await self.start_authentication(
@@ -235,6 +241,11 @@ class OANRegistrantAuthenticationService(G2PRegistrantAuthenticationService):
                             subject = adapter.registrant_subject(claims, login_provider=login)
                             if not isinstance(subject, str) or not re.fullmatch(r"[0-9]{12}", subject):
                                 return await self._mark_failure(session, auth, "FIN (Fayda ID): Fayda did not return a 12-digit FIN. Verify again or contact support")
+                            form_fin = context.get("oan_form_fin")
+                            if form_fin and subject != form_fin:
+                                return await self._mark_failure(session, auth,
+                                    f"Fayda ID (FIN / FAN): the Fayda sign-in was for a different FIN than {form_fin} on the form. "
+                                    "Sign in with this farmer's own Fayda identity, or correct the Fayda ID on the form and verify again")
                             if auth.internal_record_id and not auth.internal_record_id.startswith(UNBOUND):
                                 saved = await self._stored(session, ("G2PRegisterFarmer", "G2PIntakeFormFarmer"), auth.internal_record_id)
                                 if saved and saved.get("last_authentication_status") == "SUCCESS" and saved.get("foundational_id") != subject:

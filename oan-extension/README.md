@@ -149,7 +149,7 @@ the claims, or eSignet returns only its pairwise `sub` and every verification
 fails as "not the FIN on this form":
 
 ```json
-{"extra_authorize_params": {"claims_locales": "en", "claims": {"id_token": {},
+{"extra_authorize_params": {"claims_locales": "en am", "claims": {"id_token": {},
   "userinfo": {"individual_id": {"essential": true}, "name": {"essential": true},
                "gender": {"essential": false}, "birthdate": {"essential": false}}}}}
 ```
