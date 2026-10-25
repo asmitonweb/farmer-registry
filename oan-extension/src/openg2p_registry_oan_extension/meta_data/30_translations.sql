@@ -161,7 +161,7 @@ WITH oan (language_code, labels) AS (
     "oan_idv_verified": "Verified on {date}",
     "oan_idv_failed": "Not verified",
     "oan_idv_filled": "Filled in from Fayda: {fields}. These cannot be changed.",
-    "oan_idv_no_fin": "Enter the FIN first, then verify.",
+    "oan_idv_no_fin": "Enter the farmer''s Fayda ID (FIN) first, then verify.",
     "oan_idv_popup_blocked": "The browser blocked the Fayda window. Allow pop-ups for this site and verify again.",
     "oan_idv_closed": "The Fayda window was closed before the sign-in finished. Verify again.",
     "oan_idv_fin_changed": "The FIN was changed after verification. Verify again with the new FIN."

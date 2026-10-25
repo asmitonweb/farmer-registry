@@ -34,7 +34,7 @@ const LABELS: Record<string, string> = {
     oan_idv_verified: 'Verified on {date}',
     oan_idv_failed: 'Not verified',
     oan_idv_filled: 'Filled in from Fayda: {fields}. These cannot be changed.',
-    oan_idv_no_fin: 'Enter the FIN first, then verify.',
+    oan_idv_no_fin: "Enter the farmer's Fayda ID (FIN) first, then verify.",
     oan_idv_popup_blocked: 'The browser blocked the Fayda window. Allow pop-ups for this site and verify again.',
     oan_idv_closed: 'The Fayda window was closed before the sign-in finished. Verify again.',
     oan_idv_fin_changed: 'The FIN was changed after verification. Verify again with the new FIN.',
@@ -119,6 +119,9 @@ export function IdentityVerificationWidget({ config }: { config: Config }) {
         timer.current = null;
         setBusy(false);
     }, []);
+    // A message about the FIN, or about a sign-in for another FIN, no longer
+    // applies once the FIN changes.
+    useEffect(() => setProblem(null), [fin]);
     useEffect(() => () => {
         if (timer.current) window.clearTimeout(timer.current);
         try { popup.current?.close(); } catch { /* the window may be gone */ }
@@ -251,8 +254,9 @@ export function IdentityVerificationWidget({ config }: { config: Config }) {
                                     border: '1px solid var(--owt-btn-primary-border)',
                                 }}
                                 onClick={verify}
-                                disabled={busy || !fin}
-                                title={!fin ? say('oan_idv_no_fin') : undefined}
+                                // Enabled without a FIN too: a click then says to enter it,
+                                // where a disabled button would do nothing and say nothing.
+                                disabled={busy}
                             >
                                 {say(verified ? 'oan_idv_verify_again' : 'oan_idv_verify')}
                             </button>
