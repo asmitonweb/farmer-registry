@@ -168,6 +168,6 @@ WITH oan (language_code, labels) AS (
   }'::jsonb)
 )
 UPDATE "public"."registry_languages" l
-SET "domain_translation" = (COALESCE(l."domain_translation"::jsonb, '{}'::jsonb) || oan.labels)::json
+SET "domain_translation" = ((COALESCE(l."domain_translation"::jsonb, '{}'::jsonb) - 'oan_idv_no_fin') || oan.labels)::json
 FROM oan
 WHERE l."language_code" = oan.language_code;
