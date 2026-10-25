@@ -8,9 +8,9 @@
 -- full is OAN's. 90_checks.sql fails the seed if an upstream id is not found.
 -- column_span widens a column: the location map takes two.
 --
--- Dates are upstream's date widget, entered in the Gregorian calendar; the
--- Ethiopian calendar twins are derived by the domain services, and the birth
--- date's is shown read-only next to it (oan-ethiopian-date).
+-- Staff-entered dates use upstream's Ethiopian-calendar input through the
+-- date widget's "ethiopian" variant (15_sections.sql). Stored values stay
+-- Gregorian ISO dates; server-derived Ethiopian twins still feed reports.
 --
 -- Yes/no questions are answered yes or no: "allowUnset": false drops the
 -- radio's "Not set" choice. An unanswered question stays empty.
@@ -90,13 +90,8 @@ form_layout (oan_section_id, upstream_section_id, col, ord, w) AS (
   ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 1, 3,
    '{"widget-id": "last_name", "widget-label": "grandfathers_name_eng"}'),
   ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 1, 1, '{"widget-id": "gender"}'),
-  ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 1, 2, '{"widget-id": "birth_date"}'),
-  -- The birth date in the Ethiopian calendar, shown as it is entered; the
-  -- stored twin (birth_date_ec) is derived by the server.
-  ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 1, 3,
-   '{"widget": "oan-ethiopian-date", "widget-id": "birth_date_ec", "widget-type": "input", "widget-label": "birth_date_ec",
-     "widget-readonly": true, "widget-required": false,
-     "widget-data-options": {"source": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.birth_date"}}'),
+  ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 1, 2,
+   '{"widget-id": "birth_date", "widget-variant": "ethiopian"}'),
   ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 1, 4, '{"widget-id": "estimated_age", "widget-data-format": {"allowSigned": false, "numericType": "integer"}}'),
   ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 2, 1,
    '{"widget": "text", "widget-id": "first_name_amh", "widget-type": "input", "widget-label": "first_name_amh",

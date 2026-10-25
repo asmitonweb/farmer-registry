@@ -86,3 +86,35 @@ ON CONFLICT ("section_id") DO UPDATE SET
   "section_mnemonic" = EXCLUDED."section_mnemonic", "section_description" = EXCLUDED."section_description",
   "is_list" = EXCLUDED."is_list", "section_weightage" = EXCLUDED."section_weightage",
   "section_ui_schema" = EXCLUDED."section_ui_schema";
+
+-- Apply after both derived and OAN-only sections exist. Walking the full JSON
+-- also covers dates in table columns (household members and child registers).
+-- This is metadata configuration; the date widget and stored field stay native.
+CREATE OR REPLACE FUNCTION pg_temp.oan_ethiopian_dates(node jsonb)
+RETURNS jsonb LANGUAGE plpgsql AS $$
+DECLARE
+  result jsonb;
+BEGIN
+  IF jsonb_typeof(node) = 'array' THEN
+    SELECT COALESCE(jsonb_agg(pg_temp.oan_ethiopian_dates(value) ORDER BY ord), '[]'::jsonb)
+      INTO result FROM jsonb_array_elements(node) WITH ORDINALITY AS a(value, ord);
+  ELSIF jsonb_typeof(node) = 'object' THEN
+    SELECT COALESCE(jsonb_object_agg(key, pg_temp.oan_ethiopian_dates(value)), '{}'::jsonb)
+      INTO result FROM jsonb_each(node);
+    IF node->>'widget' = 'date' AND COALESCE((node->>'widget-readonly')::boolean, false) = false THEN
+      result := result || '{"widget-variant": "ethiopian"}'::jsonb;
+      -- Native TableCellDate ignores variants. A registered custom cell type
+      -- takes TableWidget's supported WidgetRenderer path and row callback.
+      IF node ? 'column-key' THEN
+        result := result || '{"widget": "oan-ethiopian-date-input"}'::jsonb;
+      END IF;
+    END IF;
+  ELSE
+    result := node;
+  END IF;
+  RETURN result;
+END $$;
+
+UPDATE "public"."g2p_register_sections"
+SET section_ui_schema = pg_temp.oan_ethiopian_dates(section_ui_schema)
+WHERE section_ui_schema IS NOT NULL;

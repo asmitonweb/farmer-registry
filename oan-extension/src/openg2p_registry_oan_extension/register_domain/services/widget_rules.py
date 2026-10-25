@@ -53,7 +53,12 @@ MESSAGES = {
     "oan_rule_required": "{label}: this is required. Fill it in on every row before saving.",
 }
 
-_TYPES = {"boolean": "boolean", "date": "date", "number": "number"}
+_TYPES = {
+    "boolean": "boolean",
+    "date": "date",
+    "oan-ethiopian-date-input": "date",
+    "number": "number",
+}
 
 
 def _widgets(node):
