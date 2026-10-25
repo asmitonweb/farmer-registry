@@ -1,5 +1,8 @@
 -- Put the OAN sections where the upstream ones were, on the register tabs and
--- the intake form, then detach the upstream sections from those places.
+-- the intake form, then detach the upstream sections from those places. The
+-- Farmer Personal Information replacement is split into identity, name and
+-- personal-details sections; all three stay adjacent before the photo/location
+-- sections.
 --
 -- Each OAN attachment copies the tab and order of the upstream one it replaces.
 -- The upstream rows are removed by explicit id, never by NOT IN, so a section
@@ -31,6 +34,23 @@ ON CONFLICT ("tab_section_id") DO UPDATE SET
   "register_id" = EXCLUDED."register_id", "tab_id" = EXCLUDED."tab_id",
   "section_id" = EXCLUDED."section_id", "section_order" = EXCLUDED."section_order";
 
+-- Split Personal Information into three adjacent sections. The UI section-id
+-- is rewritten in 12_form_sections.sql because MultiSectionAccordionForms
+-- matches saves by UI section-id; copied upstream ids would collide.
+INSERT INTO "public"."g2p_register_ui_tab_sections" ("tab_section_id", "register_id", "tab_id", "section_id", "section_order")
+SELECT v.tab_section_id, t.register_id, t.tab_id, v.section_id, t.section_order + v.order_offset
+FROM "public"."g2p_register_ui_tab_sections" t
+JOIN (VALUES
+  ('oan_farmer_name_register', 'oan_farmer_name', 1),
+  ('oan_farmer_personal_details_register', 'oan_farmer_personal_details', 2)
+) v(tab_section_id, section_id, order_offset) ON true
+JOIN "public"."g2p_register_sections" s ON s.section_id = v.section_id
+WHERE t.tab_id = 'farmer_farmer_tab'
+  AND t.section_id = 'oan_farmer_personal_identification'
+ON CONFLICT ("tab_section_id") DO UPDATE SET
+  "register_id" = EXCLUDED."register_id", "tab_id" = EXCLUDED."tab_id",
+  "section_id" = EXCLUDED."section_id", "section_order" = EXCLUDED."section_order";
+
 WITH replaced (upstream_section_id, oan_section_id) AS (
   VALUES ('farmer_farmer_personal_identification_section_01', 'oan_farmer_personal_identification'),
          ('farmer_farmer_socio_economic_and_health_section_04', 'oan_farmer_socio_economic_and_health'),
@@ -52,6 +72,19 @@ WHERE t.tab_id IN ('a1a4d25a-1cd4-4356-abac-72482721', '9055ab43-c85d-4833-bd00-
 ON CONFLICT ("tab_section_id") DO UPDATE SET
   "tab_id" = EXCLUDED."tab_id", "section_id" = EXCLUDED."section_id", "section_order" = EXCLUDED."section_order";
 
+INSERT INTO "public"."g2p_intake_form_ui_tab_sections" ("tab_section_id", "tab_id", "section_id", "section_order")
+SELECT v.tab_section_id, t.tab_id, v.section_id, t.section_order + v.order_offset
+FROM "public"."g2p_intake_form_ui_tab_sections" t
+JOIN (VALUES
+  ('oan_farmer_name_intake', 'oan_farmer_name', 1),
+  ('oan_farmer_personal_details_intake', 'oan_farmer_personal_details', 2)
+) v(tab_section_id, section_id, order_offset) ON true
+JOIN "public"."g2p_register_sections" s ON s.section_id = v.section_id
+WHERE t.tab_id = 'a1a4d25a-1cd4-4356-abac-72482721'
+  AND t.section_id = 'oan_farmer_personal_identification'
+ON CONFLICT ("tab_section_id") DO UPDATE SET
+  "tab_id" = EXCLUDED."tab_id", "section_id" = EXCLUDED."section_id", "section_order" = EXCLUDED."section_order";
+
 -- OAN's tab on the farmer's record: Enumerator. Location stays on the farmer
 -- tab, as OpenG2P recommends.
 INSERT INTO "public"."g2p_register_ui_tabs" ("tab_id", "register_id", "tab_label", "tab_order", "is_active")
@@ -64,7 +97,7 @@ ON CONFLICT ("tab_id") DO UPDATE SET
 INSERT INTO "public"."g2p_register_ui_tab_sections" ("tab_section_id", "register_id", "tab_id", "section_id", "section_order")
 SELECT v.tab_section_id, 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd', v.tab_id, v.section_id, v.section_order
 FROM (VALUES
-  ('oan_farmer_phones_tab_section', 'farmer_farmer_tab', 'oan_farmer_phones', 12),
+  ('oan_farmer_phones_tab_section', 'farmer_farmer_tab', 'oan_farmer_phones', 13),
   ('oan_farmer_land_summary_tab_section', 'farmer_land_tab', 'oan_farmer_land_summary', 5),
   ('oan_farmer_enumerator_tab_section', 'oan_farmer_enumerator_tab', 'oan_farmer_enumerator', 10)
 ) v(tab_section_id, tab_id, section_id, section_order)
