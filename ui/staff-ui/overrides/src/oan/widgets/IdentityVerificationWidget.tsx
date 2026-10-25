@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -70,8 +70,9 @@ function popupFeatures(width: number, height: number): string {
  *                         fieldPrefix (the register's data path prefix),
  *                         popupWidth, popupHeight}
  *
- * The status, the Verify button and any message go in the section's footer,
- * before Previous and Next, so answering "Has National ID" does not add a row
+ * The status and the Verify button go in the section's footer, before
+ * Previous and Next, and any message in the footer's free space on the left,
+ * so answering "Has National ID" does not add a row
  * to the section, and the FIN can be typed or filled in by verifying. The
  * layout has no slot there, so they are portalled into the footer of the
  * section this widget is in, and shown as a row when no footer is found.
@@ -121,11 +122,16 @@ export function IdentityVerificationWidget({ config }: { config: Config }) {
     const timer = useRef<number | null>(null);
     const root = useRef<HTMLDivElement | null>(null);
     const [footer, setFooter] = useState<HTMLElement | null>(null);
+    // Until the footer has been looked for, render nothing, so the inline
+    // fallback never flashes before the widget moves into the footer.
+    const [placed, setPlaced] = useState(false);
 
-    useEffect(() => {
+    // Before paint, so the first frame already shows the footer placement.
+    useLayoutEffect(() => {
         const controls = root.current
             ?.closest('.intake-form-accordion-content')
             ?.querySelector<HTMLElement>('.intake-form-edit-controls');
+        setPlaced(true);
         if (!controls) return undefined;
         const host = document.createElement('span');
         host.className = 'oan-idv-footer-action';
@@ -309,17 +315,24 @@ export function IdentityVerificationWidget({ config }: { config: Config }) {
         </span>
     );
 
+    if (!placed) return <div ref={root} />;
+
     if (footer) {
         return (
             <div ref={root}>
                 {createPortal(
-                    <span className="inline-flex flex-col items-end gap-1 mr-auto sm:mr-0" style={{ maxWidth: '36rem' }}>
-                        <span className="inline-flex flex-wrap items-center justify-end gap-3">
-                            {statusLine}
-                            {button}
+                    <>
+                        {/* Messages use the free space on the left of the footer, so the
+                            status and the button keep their place. */}
+                        <span
+                            className="flex flex-col gap-0.5 text-left"
+                            style={{ flex: '1 1 0', minWidth: 0, marginRight: 'auto' }}
+                        >
+                            {messages}
                         </span>
-                        {messages}
-                    </span>,
+                        {statusLine}
+                        {button}
+                    </>,
                     footer,
                 )}
             </div>
