@@ -139,9 +139,21 @@ with their own Fayda ID, then verify again"*.
 `esignet`, `oauth_callback_url` = the staff API's `/registrant-auth/callback`,
 client id and private key, and `provider_config` with `scope`, `issuer`,
 `audiences`); these are environment secrets, not seed data. The eSignet client
-must request the `individual_id` claim. The staff API needs
-`registrant_auth_session_store_backend=redis` when it runs more than one worker,
-since the sign-in returns to whichever worker answers.
+must have that callback among its redirect URIs. `provider_config` must ask for
+the claims, or eSignet returns only its pairwise `sub` and every verification
+fails as "not the FIN on this form":
+
+```json
+{"extra_authorize_params": {"claims_locales": "en", "claims": {"id_token": {},
+  "userinfo": {"individual_id": {"essential": true}, "name": {"essential": true},
+               "gender": {"essential": false}, "birthdate": {"essential": false}}}}}
+```
+
+The adapter must be `esignet`, not `default_oidc`: only the eSignet adapter
+reads userinfo and compares `individual_id` with the FIN. Core keeps the
+sign-in transactions in Redis by default and its URL defaults to
+`redis://localhost`, so the staff API needs
+`REGISTRY_CORE_REGISTRANT_AUTH_REDIS_URL` (any Redis the workers share).
 
 `provider_config.claim_mapping` says which claim fills which field; without it
 the default in `register_domain/identity_claims.py` applies (full name in
