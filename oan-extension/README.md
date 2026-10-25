@@ -152,6 +152,14 @@ fails as "not the FIN on this form":
                "gender": {"essential": false}, "birthdate": {"essential": false}}}}}
 ```
 
+
+For a local HTTP gateway in front of an HTTPS canonical eSignet issuer, set
+`provider_config.jwt_assertion_aud` to the exact canonical token endpoint from
+discovery. The OAN registered service maps this native IAM audience setting
+separately from the provider's transport `token_endpoint`. Do not change keys,
+disable signature verification, or alter ID-token audiences to fix this mismatch.
+Six regressions cover the override, native default and invalid configuration.
+
 The adapter must be `esignet`, not `default_oidc`: only the eSignet adapter
 reads userinfo and compares `individual_id` with the FIN. Core keeps the
 sign-in transactions in Redis by default and its URL defaults to
