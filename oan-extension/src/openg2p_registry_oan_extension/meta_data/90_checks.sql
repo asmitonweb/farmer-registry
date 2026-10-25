@@ -91,6 +91,24 @@ BEGIN
     RAISE EXCEPTION 'OAN sections not on the intake form: %', missing;
   END IF;
 
+  -- Every entered date, including child/table fields, uses the same calendar.
+  SELECT string_agg(DISTINCT s.section_id || '.' || COALESCE(w->>'widget-id', w->>'column-key'), ', ')
+    INTO missing
+  FROM "public"."g2p_register_sections" s,
+       jsonb_path_query(s.section_ui_schema,
+         'lax $.** ? (@.widget == "date" || @.widget == "oan-ethiopian-date-input")') w
+  WHERE COALESCE((w->>'widget-readonly')::boolean, false) = false
+    AND w->>'widget-variant' IS DISTINCT FROM 'ethiopian';
+  IF missing IS NOT NULL THEN
+    RAISE EXCEPTION 'Staff-entered dates missing the Ethiopian calendar variant: %', missing;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM "public"."g2p_register_sections"
+             WHERE section_id LIKE 'oan\_%'
+               AND jsonb_path_exists(section_ui_schema, 'lax $.** ? (@.widget == "oan-ethiopian-date")')) THEN
+    RAISE EXCEPTION 'Obsolete read-only Ethiopian date widget remains in OAN metadata';
+  END IF;
+
   -- A section replaced by an OAN one must not show twice.
   SELECT string_agg(section_id, ', ') INTO missing
   FROM (SELECT section_id FROM "public"."g2p_register_ui_tab_sections"
