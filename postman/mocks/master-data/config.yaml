@@ -1,0 +1,15 @@
+version: 1
+id: bbd273cc-3211-4384-b6d6-3f91ee6ee8da
+name: master-data
+slug: master-data
+protocol: http
+interceptRequests: true
+port: 4907
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true
+  - name: unavailable
+    path: ./unavailable.js
+  - name: malformed
+    path: ./malformed.js

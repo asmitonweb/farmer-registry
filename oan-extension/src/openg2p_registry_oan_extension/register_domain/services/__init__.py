@@ -6,6 +6,7 @@ import time
 
 from openg2p_fastapi_common.context import dbengine
 from openg2p_registry_core.errors import G2PRegistryErrorCodes, G2PRegistryException
+from openg2p_registry_core.helpers.master_data import MasterDataClient
 from openg2p_registry_core.services import G2PRegisterDomainService
 from openg2p_registry_farmer_extension.register_domain import services as _farmer
 from openg2p_registry_farmer_extension.register_domain.services import *
@@ -15,6 +16,7 @@ from openg2p_registry_farmer_extension.register_domain.services.domain_validatio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from .attribute_validation import check_attribute_values, check_domain_bounds
 from .derivations import DERIVATIONS, Derivations
 from .household_intake import install_farmer_household_check  # noqa: F401
 from .identity_verification import (  # noqa: F401
@@ -94,6 +96,11 @@ class WidgetRuleValidation:
             for record in records:
                 normalize_record(record, field_rules)
             problems = [p for record in records for p in check_record(record, field_rules, messages)]
+        say = _Say(messages)
+        problems += check_domain_bounds(records, self.register_mnemonic(), field_rules, say)
+        if not problems:
+            client = MasterDataClient.get_component()
+            problems = await check_attribute_values(records, field_rules, say, client._post if client else None)
         if not problems and type(self)._verifies_identity:
             # The Fayda verification, once the values themselves are right.
             say = _Say(messages)
