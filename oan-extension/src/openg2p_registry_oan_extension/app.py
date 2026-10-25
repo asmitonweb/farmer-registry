@@ -44,6 +44,9 @@ class Initializer(FarmerInitializer):
         )
 
         install_attribute_messages()
+        from .register_domain.services.outgest_json import install_outgest_json
+
+        install_outgest_json()
 
     async def fastapi_app_startup(self, app):
         await super().fastapi_app_startup(app)
