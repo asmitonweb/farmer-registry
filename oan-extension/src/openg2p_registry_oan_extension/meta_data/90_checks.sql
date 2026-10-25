@@ -149,6 +149,15 @@ BEGIN
     RAISE EXCEPTION 'Personal Information sections are not placed on the Farmer intake tab: %', missing;
   END IF;
 
+  SELECT string_agg(section_mnemonic, ', ') INTO missing
+  FROM "public"."g2p_register_sections"
+  WHERE section_id IN ('oan_farmer_personal_identification', 'oan_farmer_name', 'oan_farmer_personal_details')
+  GROUP BY section_mnemonic
+  HAVING count(*) > 1;
+  IF missing IS NOT NULL THEN
+    RAISE EXCEPTION 'Personal Information section mnemonics are not unique: %', missing;
+  END IF;
+
   IF EXISTS (
     SELECT 1
     FROM (

@@ -317,7 +317,13 @@ INSERT INTO "public"."g2p_register_sections" (
   "section_description", "documents_required", "no_of_verifications_required", "is_list",
   "section_weightage", "section_ui_schema", "cr_auto_approve_for_bene_portal",
   "cr_auto_approve_for_agent_portal", "cr_auto_approve_for_staff_portal", "cr_auto_approve_for_partner")
-SELECT u.register_id, d.oan_section_id, u.section_register_id, u.is_core_section, 'oan_' || u.section_mnemonic,
+SELECT u.register_id, d.oan_section_id, u.section_register_id, u.is_core_section,
+       CASE d.oan_section_id
+         WHEN 'oan_farmer_personal_identification' THEN 'oan_fr_farmer_identity'
+         WHEN 'oan_farmer_name' THEN 'oan_fr_farmer_name'
+         WHEN 'oan_farmer_personal_details' THEN 'oan_fr_farmer_personal_details'
+         ELSE 'oan_' || u.section_mnemonic
+       END,
        u.section_description, u.documents_required, u.no_of_verifications_required, u.is_list, u.section_weightage,
        jsonb_set(
          jsonb_set(
