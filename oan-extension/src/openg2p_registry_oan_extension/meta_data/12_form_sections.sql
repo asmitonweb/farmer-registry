@@ -1,5 +1,5 @@
--- OAN's form sections, laid out as one row of three columns, the way upstream
--- lays out its own: personal identification, socio-economic and health,
+-- OAN's form sections, laid out as rows of columns, the way upstream lays out
+-- its own: identity, name, personal details, socio-economic and health,
 -- membership, household information, location and documents.
 --
 -- form_layout says which widget goes in which column, in what order. A widget
@@ -79,89 +79,94 @@ doc_widgets (col, ord, w) AS (
 ),
 form_layout (oan_section_id, upstream_section_id, col, ord, w) AS (
   VALUES
-  -- Personal identification. Upstream's first, middle and last name are the
+  -- Personal identity, names and details are split into three OAN sections.
+  -- Personal identification keeps identifiers; column 1/order 1 is reserved
+  -- for the intake identity-verification widget.
+  -- Names retain the existing English, Amharic and primary-language widgets.
+  -- Personal details retain demographics, birth date and education.
+  -- Upstream's first, middle and last name are the
   -- English first, father's and grandfather's name. The names in the primary
   -- language appear once a language is chosen and are disabled when it is
   -- Amharic (the last show or hide rule wins, so "chosen and not Amharic" is
   -- two rules). The identifiers are attributes of the farmer: the Fayda FIN
   -- (upstream's foundational_id), the Fayda RID, the ODK Farmer ID and the Pula
   -- (Mavuno) ID.
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 1,
+  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 1, 1,
    '{"widget-id": "first_name", "widget-label": "first_name_eng"}'::jsonb),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 2,
+  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 1, 2,
    '{"widget-id": "middle_name", "widget-label": "fathers_name_eng"}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 3,
+  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 1, 3,
    '{"widget-id": "last_name", "widget-label": "grandfathers_name_eng"}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 4, '{"widget-id": "gender"}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 5, '{"widget-id": "birth_date"}'),
+  ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 1, 1, '{"widget-id": "gender"}'),
+  ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 1, 2, '{"widget-id": "birth_date"}'),
   -- The birth date in the Ethiopian calendar, shown as it is entered; the
   -- stored twin (birth_date_ec) is derived by the server.
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 6,
+  ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 1, 3,
    '{"widget": "oan-ethiopian-date", "widget-id": "birth_date_ec", "widget-type": "input", "widget-label": "birth_date_ec",
      "widget-readonly": true, "widget-required": false,
      "widget-data-options": {"source": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.birth_date"}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 7, '{"widget-id": "estimated_age", "widget-data-format": {"allowSigned": false, "numericType": "integer"}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 2, 1,
+  ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 1, 4, '{"widget-id": "estimated_age", "widget-data-format": {"allowSigned": false, "numericType": "integer"}}'),
+  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 2, 1,
    '{"widget": "text", "widget-id": "first_name_amh", "widget-type": "input", "widget-label": "first_name_amh",
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.first_name_amh",
      "widget-data-validation": {"pattern": "^[\u1200-\u137f\u2d80-\u2ddf\uab00-\uab2f ]+$", "maxLength": 100,
                                 "patternMessage": "ethiopic_script_only"}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 2, 2,
+  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 2, 2,
    '{"widget": "text", "widget-id": "middle_name_amh", "widget-type": "input", "widget-label": "fathers_name_amh",
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.middle_name_amh",
      "widget-data-validation": {"pattern": "^[\u1200-\u137f\u2d80-\u2ddf\uab00-\uab2f ]+$", "maxLength": 100,
                                 "patternMessage": "ethiopic_script_only"}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 2, 3,
+  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 2, 3,
    '{"widget": "text", "widget-id": "last_name_amh", "widget-type": "input", "widget-label": "grandfathers_name_amh",
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_name_amh",
      "widget-data-validation": {"pattern": "^[\u1200-\u137f\u2d80-\u2ddf\uab00-\uab2f ]+$", "maxLength": 100,
                                 "patternMessage": "ethiopic_script_only"}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 2, 4,
+  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 2, 4,
    '{"widget": "select", "widget-id": "language_spoken", "widget-type": "input", "widget-label": "primary_language",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken",
      "widget-data-source": {"type": "api", "method": "POST", "params": {"attribute_id": "LANGUAGE"},
                             "service": "attributes", "endpoint": "values", "labelKey": "value_display", "valueKey": "value_code"}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 2, 5,
+  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 3, 1,
    '{"widget": "text", "widget-id": "first_name_other", "widget-type": "input", "widget-label": "first_name_other",
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.first_name_other", "widget-data-validation": {"maxLength": 100},
      "widget-data-options": {"actions": [
        {"action": "show", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken", "operator": "notEmpty"}},
        {"action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken", "operator": "equals", "value": "AMHARIC"}}]}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 2, 6,
+  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 3, 2,
    '{"widget": "text", "widget-id": "middle_name_other", "widget-type": "input", "widget-label": "fathers_name_other",
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.middle_name_other", "widget-data-validation": {"maxLength": 100},
      "widget-data-options": {"actions": [
        {"action": "show", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken", "operator": "notEmpty"}},
        {"action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken", "operator": "equals", "value": "AMHARIC"}}]}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 2, 7,
+  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 3, 3,
    '{"widget": "text", "widget-id": "last_name_other", "widget-type": "input", "widget-label": "grandfathers_name_other",
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_name_other", "widget-data-validation": {"maxLength": 100},
      "widget-data-options": {"actions": [
        {"action": "show", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken", "operator": "notEmpty"}},
        {"action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken", "operator": "equals", "value": "AMHARIC"}}]}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 3, 1, '{"widget-id": "marital_status"}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 3, 2, '{"widget-id": "education_level"}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 3, 3,
+  ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 2, 1, '{"widget-id": "marital_status"}'),
+  ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 2, 2, '{"widget-id": "education_level"}'),
+  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 2,
    '{"widget": "boolean", "widget-id": "has_national_id", "widget-type": "input", "widget-label": "has_national_id",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.has_national_id",
      "widget-data-format": {"allowUnset": false, "booleanControlType": "radio", "booleanRepresentation": "yes-no"}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 3, 4,
+  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 3,
    '{"widget": "text", "widget-id": "foundational_id", "widget-type": "input", "widget-label": "fayda_fin",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.foundational_id",
      "widget-data-validation": {"pattern": "^[0-9]{12}$", "patternMessage": "fayda_fin_format"}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 3, 5,
+  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 4,
    '{"widget": "text", "widget-id": "rid", "widget-type": "input", "widget-label": "fayda_rid",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.rid",
      "widget-data-validation": {"pattern": "^[0-9]{29}$", "patternMessage": "fayda_rid_format"}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 3, 6,
+  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 5,
    '{"widget": "text", "widget-id": "odk_farmer_id", "widget-type": "input", "widget-label": "odk_farmer_id",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.odk_farmer_id", "widget-data-validation": {"maxLength": 64}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 3, 7,
+  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 6,
    '{"widget": "text", "widget-id": "pula_id", "widget-type": "input", "widget-label": "pula_id",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.pula_id", "widget-data-validation": {"maxLength": 64}}'),
@@ -321,7 +326,16 @@ INSERT INTO "public"."g2p_register_sections" (
   "cr_auto_approve_for_agent_portal", "cr_auto_approve_for_staff_portal", "cr_auto_approve_for_partner")
 SELECT u.register_id, d.oan_section_id, u.section_register_id, u.is_core_section, 'oan_' || u.section_mnemonic,
        u.section_description, u.documents_required, u.no_of_verifications_required, u.is_list, u.section_weightage,
-       jsonb_set(u.section_ui_schema, '{panels}', p.panels),
+       jsonb_set(
+         jsonb_set(
+           jsonb_set(u.section_ui_schema, '{panels}', p.panels),
+           '{section-id}', to_jsonb(d.oan_section_id)),
+         '{section-title}', to_jsonb(CASE d.oan_section_id
+           WHEN 'oan_farmer_personal_identification' THEN 'farmer_identity'
+           WHEN 'oan_farmer_name' THEN 'farmer_name'
+           WHEN 'oan_farmer_personal_details' THEN 'farmer_personal_details'
+           ELSE u.section_ui_schema->>'section-title'
+         END)),
        u.cr_auto_approve_for_bene_portal, u.cr_auto_approve_for_agent_portal,
        u.cr_auto_approve_for_staff_portal, u.cr_auto_approve_for_partner
 FROM (SELECT DISTINCT oan_section_id, upstream_section_id FROM form_layout) d

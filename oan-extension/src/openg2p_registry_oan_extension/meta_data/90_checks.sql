@@ -9,10 +9,10 @@ DECLARE
 BEGIN
   SELECT string_agg(f, ', ') INTO missing
   FROM (VALUES
-    ('oan_farmer_personal_identification', 'first_name_amh'),
-    ('oan_farmer_personal_identification', 'last_name_other'),
-    ('oan_farmer_personal_identification', 'language_spoken'),
-    ('oan_farmer_personal_identification', 'birth_date'),
+    ('oan_farmer_name', 'first_name_amh'),
+    ('oan_farmer_name', 'last_name_other'),
+    ('oan_farmer_name', 'language_spoken'),
+    ('oan_farmer_personal_details', 'birth_date'),
     ('oan_farmer_photo', 'farmer-photo'),
     ('oan_farmer_socio_economic_and_health', 'is_psnp_user'),
     ('oan_farmer_membership_details', 'primary_commodity'),
@@ -68,7 +68,8 @@ BEGIN
   END IF;
 
   SELECT string_agg(section_id, ', ') INTO missing
-  FROM (VALUES ('oan_farmer_personal_identification'), ('oan_farmer_socio_economic_and_health'),
+   FROM (VALUES ('oan_farmer_personal_identification'), ('oan_farmer_name'), ('oan_farmer_personal_details'),
+                ('oan_farmer_socio_economic_and_health'),
                ('oan_farmer_membership_details'), ('oan_farmer_lands'), ('oan_farmer_livestock'),
                ('oan_farmer_farm_inputs'), ('oan_farmer_household_lookup'), ('oan_household_information'),
                ('oan_farmer_location'), ('oan_farmer_crops'), ('oan_farmer_phones'),
@@ -79,7 +80,8 @@ BEGIN
   END IF;
 
   SELECT string_agg(section_id, ', ') INTO missing
-  FROM (VALUES ('oan_farmer_personal_identification'), ('oan_farmer_socio_economic_and_health'),
+   FROM (VALUES ('oan_farmer_personal_identification'), ('oan_farmer_name'), ('oan_farmer_personal_details'),
+                ('oan_farmer_socio_economic_and_health'),
                ('oan_farmer_membership_details'), ('oan_farmer_lands'), ('oan_farmer_livestock_intake'),
                ('oan_farmer_farm_inputs_intake'), ('oan_farmer_photo'),
                ('oan_household_information'), ('oan_farmer_location'), ('oan_farmer_crops_intake'),
@@ -113,9 +115,37 @@ BEGIN
 
   -- A new household can be entered, so the household lookup is optional (10_sections.sql).
   IF EXISTS (SELECT 1 FROM "public"."g2p_register_sections" s,
-                  jsonb_array_elements(s."section_ui_schema" #> '{panels,0,panels,0,widgets}') w
-             WHERE s."section_id" = 'oan_farmer_household_lookup'
-               AND w ->> 'widget-id' = 'household_lookup' AND (w ->> 'widget-required')::boolean IS TRUE) THEN
+                   jsonb_array_elements(s."section_ui_schema" #> '{panels,0,panels,0,widgets}') w
+              WHERE s."section_id" = 'oan_farmer_household_lookup'
+                AND w ->> 'widget-id' = 'household_lookup' AND (w ->> 'widget-required')::boolean IS TRUE) THEN
     RAISE EXCEPTION 'The household lookup on the farmer form is still required';
+  END IF;
+
+  SELECT string_agg(tab_id || ':' || section_id, ', ') INTO missing
+  FROM (VALUES
+    ('farmer_farmer_tab', 'oan_farmer_personal_identification'),
+    ('farmer_farmer_tab', 'oan_farmer_name'),
+    ('farmer_farmer_tab', 'oan_farmer_personal_details')
+  ) e(tab_id, section_id)
+  WHERE NOT EXISTS (
+    SELECT 1 FROM "public"."g2p_register_ui_tab_sections" t
+    WHERE t."tab_id" = e.tab_id AND t."section_id" = e.section_id
+  );
+  IF missing IS NOT NULL THEN
+    RAISE EXCEPTION 'Personal Information sections are not placed on the Farmer register tab: %', missing;
+  END IF;
+
+  SELECT string_agg(tab_id || ':' || section_id, ', ') INTO missing
+  FROM (VALUES
+    ('a1a4d25a-1cd4-4356-abac-72482721', 'oan_farmer_personal_identification'),
+    ('a1a4d25a-1cd4-4356-abac-72482721', 'oan_farmer_name'),
+    ('a1a4d25a-1cd4-4356-abac-72482721', 'oan_farmer_personal_details')
+  ) e(tab_id, section_id)
+  WHERE NOT EXISTS (
+    SELECT 1 FROM "public"."g2p_intake_form_ui_tab_sections" t
+    WHERE t."tab_id" = e.tab_id AND t."section_id" = e.section_id
+  );
+  IF missing IS NOT NULL THEN
+    RAISE EXCEPTION 'Personal Information sections are not placed on the Farmer intake tab: %', missing;
   END IF;
 END $$;
