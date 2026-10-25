@@ -176,6 +176,20 @@ BEGIN
     RAISE EXCEPTION 'Personal Information section mnemonics are not unique: %', missing;
   END IF;
 
+  IF NOT EXISTS (
+    SELECT 1 FROM "public"."g2p_register_sections"
+    WHERE section_id = 'oan_farmer_personal_identification'
+      AND section_ui_schema::text LIKE '%"widget": "oan-identity-verification"%'
+  ) THEN
+    RAISE EXCEPTION 'The Fayda verification widget is missing from the farmer Identity section';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM "public"."g2p_register_definitions"
+    WHERE register_id = 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd' AND requires_registrant_authentication
+  ) THEN
+    RAISE EXCEPTION 'The Farmer register does not require registrant authentication';
+  END IF;
+
   IF EXISTS (
     SELECT 1
     FROM (

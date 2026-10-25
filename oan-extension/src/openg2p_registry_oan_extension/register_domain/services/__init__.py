@@ -16,9 +16,13 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from .derivations import DERIVATIONS, Derivations
+from .identity_verification import (  # noqa: F401
+    OANRegistrantAuthenticationService,
+    install_identity_verification,
+)
 from .registers import FarmerPhoneService
 from .upstream_messages import reword
-from .widget_rules import Rules, check_record, collect_rules, normalize_record
+from .widget_rules import Rules, _Say, check_record, collect_rules, normalize_record
 
 # Section metadata is seed data that can change without a restart.
 _RULES_TTL_SECONDS = 300
@@ -74,6 +78,7 @@ class WidgetRuleValidation:
     by its label and say what to enter (upstream_messages)."""
 
     _derive_first = False
+    _verifies_identity = False
 
     async def validate_domain_attributes(self, records: list[dict]):
         rules, registers, messages = await _load()
@@ -83,11 +88,19 @@ class WidgetRuleValidation:
             async with _reworded(messages):
                 await super().validate_domain_attributes(records)
         field_rules = rules.get(registers.get(self.register_mnemonic()), {})
-        if not field_rules:
-            return
-        for record in records:
-            normalize_record(record, field_rules)
-        problems = [p for record in records for p in check_record(record, field_rules, messages)]
+        problems: list[str] = []
+        if field_rules:
+            for record in records:
+                normalize_record(record, field_rules)
+            problems = [p for record in records for p in check_record(record, field_rules, messages)]
+        if not problems and type(self)._verifies_identity:
+            # The Fayda verification, once the values themselves are right.
+            say = _Say(messages)
+            labels = {f: say.label(field_rules.get(f, {}).get("label"), f) for r in records for f in r}
+            labels.setdefault("foundational_id", say.label(None, "foundational_id"))
+            service = OANRegistrantAuthenticationService.get_component()
+            if service:
+                problems = await service.verify_records(records, labels, self.register_mnemonic())
         if problems:
             validation_error("; ".join(dict.fromkeys(problems)))
 
@@ -105,7 +118,8 @@ def _with_widget_rules(name: str, base: type) -> type:
     upstream = base.validate_domain_attributes is not G2PRegisterDomainService.validate_domain_attributes
     derivations = DERIVATIONS.get(name[len(_PREFIX):], Derivations)
     return type(name, (WidgetRuleValidation, derivations, base),
-                {"__module__": __name__, "_upstream_validates": upstream, "_derive_first": True})
+                {"__module__": __name__, "_upstream_validates": upstream, "_derive_first": True,
+                 "_verifies_identity": name == _PREFIX + "Farmer"})
 
 
 # One subclass per farmer domain service, under the same name, so every

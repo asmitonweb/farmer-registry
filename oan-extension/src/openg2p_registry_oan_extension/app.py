@@ -23,6 +23,26 @@ OAN_REGISTERS: list[tuple] = [
 class Initializer(FarmerInitializer):
     """The farmer extension's initializer, then OAN's registers."""
 
+    def initialize(self, **kwargs):
+        super().initialize(**kwargs)
+        # Core's registrant authentication with OAN's intake verification
+        # (register_domain/services/identity_verification.py).
+        from .register_domain.services import install_identity_verification
+
+        install_identity_verification()
+
+    async def fastapi_app_startup(self, app):
+        await super().fastapi_app_startup(app)
+        # The staff API builds its FastAPI app after this initializer, so the
+        # route is added at startup, to that app. Only the staff API has core's
+        # registrant authentication controller.
+        from importlib.util import find_spec
+
+        if find_spec("openg2p_registry_staff_api"):
+            from .controllers import OANIdentityVerificationController
+
+            OANIdentityVerificationController().post_init()
+
     def migrate_database(self, args):
         super().migrate_database(args)
         # The farmer migration ran in its own event loop, which is closed now, and
