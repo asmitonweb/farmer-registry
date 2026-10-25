@@ -138,7 +138,10 @@ with their own Fayda ID, then verify again"*.
 `g2p_registrant_authentication_providers` for the Farmer register (adapter
 `esignet`, `oauth_callback_url` = the staff API's `/registrant-auth/callback`,
 client id and private key, and `provider_config` with `scope`, `issuer`,
-`audiences`); these are environment secrets, not seed data. The eSignet client
+`audiences`); these are environment secrets, not seed data. With
+`private_key_jwt` the key in `client_private_key` must be the PEM text
+(`-----BEGIN PRIVATE KEY-----`, stored as its bytes), not DER: core decodes it as
+text, and a DER key fails every sign-in after Fayda returns. The eSignet client
 must have that callback among its redirect URIs. `provider_config` must ask for
 the claims, or eSignet returns only its pairwise `sub` and every verification
 fails as "not the FIN on this form":
