@@ -64,6 +64,24 @@ changes only through a change request on the household. The enumerator name and 
 the submission. The position comes from the enumerator's device, if the browser
 allows it. They are shown on the read-only Enumerator tab.
 
+## Farmer data for Crop and Livestock
+
+Crop and Livestock keep a reference to each farmer they use. The Farmer
+registry is the source (`meta_data/50_outgestion.sql`, templates in
+`templates/`):
+
+| What | How |
+|---|---|
+| Lookup | the signed, consent-checked DCI search on the partner API. Its response is the farmer extension's own template plus a `farmer_reference` block (record id, farmer id, FIN or FAN, approval time, status, names, Amharic names, phone, location). `build_dci_template.py` builds it at image build, so the block follows upstream's template. A Consent Manager policy with scope `farmer_reference` releases that block only |
+| Change notice | outgestion publishes `farmer_reference.changed.v1` (event id, farmer id, FIN or FAN; no personal details) to the WebSub topic `oan.farmer-reference.changed.v1` on every approved farmer change; receivers fetch the details through the lookup |
+| Seed | `LOAD_TEMPLATES=true` uploads both templates; the Farmer register's `outgest_applicable` is on |
+
+Per deployment, outside this repository:
+- the partner API's response signing key;
+- Partner Management partners with their public keys;
+- the Consent Manager partner policies (purpose `farmer-reference`, scope `farmer_reference`);
+- the Celery outgestion worker and beat with the WebSub base URL.
+
 ## Staff UI widget types
 
 Besides the farmer photo, `ui/staff-ui/overrides/src/oan/widgets/` registers:

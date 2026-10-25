@@ -5,6 +5,14 @@ FROM openg2p/openg2p-farmer-registry-db-seed:${FARMER_VERSION}
 
 COPY oan-extension/src/openg2p_registry_oan_extension/meta_data/ /seed/meta_data/zz-oan/
 
+# OAN's templates (meta_data/50_outgestion.sql), uploaded with LOAD_TEMPLATES=true.
+# The DCI response is the farmer extension's own template plus OAN's block, so
+# it follows the farmer extension on every upgrade.
+COPY oan-extension/templates/ /oan/templates/
+RUN python3 /oan/templates/build_dci_template.py /seed/templates/openg2p_farmer_to_dci.json.j2 \
+        /oan/templates/farmer_reference.json.j2 /seed/templates/oan_farmer_to_dci.json.j2 \
+    && cp /oan/templates/oan_farmer_reference_changed.json.j2 /seed/templates/
+
 # Sample people from Master Data (the country pack's samples); see oan-extension/seed/.
 COPY --chmod=755 oan-extension/seed/ /oan/
 ENTRYPOINT ["/oan/entrypoint.sh"]
