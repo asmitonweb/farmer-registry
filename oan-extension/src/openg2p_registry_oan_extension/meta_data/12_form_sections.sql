@@ -140,12 +140,25 @@ form_layout (oan_section_id, upstream_section_id, col, ord, w) AS (
        {"action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken", "operator": "equals", "value": "AMHARIC"}}]}}'),
   ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 2, 1, '{"widget-id": "marital_status"}'),
   ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 2, 2, '{"widget-id": "education_level"}'),
-  -- Identity: the identifiers, and the Fayda verification (column 1, first),
-  -- shown when the farmer has a national ID. A successful verification fills
-  -- in the names, gender and birth date and locks the names and gender here;
-  -- the server refuses a change to any verified value, birth date included
-  -- (its widget already has upstream's disable rule, and the last rule wins).
+  -- Identity, in the order it is filled in: whether the farmer has a national
+  -- ID, then (when yes) the Fayda ID and its verification right below it, then
+  -- the Fayda registration ID; the other systems' IDs in the next column. A
+  -- successful verification fills in the names, gender and birth date and
+  -- locks the names and gender here; the server refuses a change to any
+  -- verified value, birth date included (its widget already has upstream's
+  -- disable rule, and the last rule wins).
   ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 1,
+   '{"widget": "boolean", "widget-id": "has_national_id", "widget-type": "input", "widget-label": "has_national_id",
+     "widget-readonly": false, "widget-required": false,
+     "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.has_national_id",
+     "widget-data-format": {"allowUnset": false, "booleanControlType": "radio", "booleanRepresentation": "yes-no"}}'),
+  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 2,
+   '{"widget": "text", "widget-id": "foundational_id", "widget-type": "input", "widget-label": "fayda_fin",
+     "widget-readonly": false, "widget-required": false,
+     "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.foundational_id",
+     "widget-data-validation": {"pattern": "^[0-9]{12}$", "patternMessage": "fayda_fin_format"},
+     "widget-data-options": {"action": "show", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.has_national_id", "operator": "equals", "value": true}}}'),
+  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 3,
    '{"widget": "oan-identity-verification", "widget-id": "identity_verification", "widget-type": "input",
      "widget-label": "identity_verification", "widget-readonly": false, "widget-required": false,
      "widget-data-path": {"verificationId": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.identity_verification_id",
@@ -156,26 +169,16 @@ form_layout (oan_section_id, upstream_section_id, col, ord, w) AS (
                              "foundationalIdPath": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.foundational_id",
                              "internalRecordIdPath": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.internal_record_id",
                              "action": "show", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.has_national_id", "operator": "equals", "value": true}}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 2,
-   '{"widget": "boolean", "widget-id": "has_national_id", "widget-type": "input", "widget-label": "has_national_id",
-     "widget-readonly": false, "widget-required": false,
-     "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.has_national_id",
-     "widget-data-format": {"allowUnset": false, "booleanControlType": "radio", "booleanRepresentation": "yes-no"}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 2, 1,
-   '{"widget": "text", "widget-id": "foundational_id", "widget-type": "input", "widget-label": "fayda_fin",
-     "widget-readonly": false, "widget-required": false,
-     "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.foundational_id",
-     "widget-data-validation": {"pattern": "^[0-9]{12}$", "patternMessage": "fayda_fin_format"}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 2, 2,
+  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 4,
    '{"widget": "text", "widget-id": "rid", "widget-type": "input", "widget-label": "fayda_rid",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.rid",
      "widget-data-validation": {"pattern": "^[0-9]{29}$", "patternMessage": "fayda_rid_format"}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 3, 1,
+  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 2, 1,
    '{"widget": "text", "widget-id": "odk_farmer_id", "widget-type": "input", "widget-label": "odk_farmer_id",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.odk_farmer_id", "widget-data-validation": {"maxLength": 64}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 3, 2,
+  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 2, 2,
    '{"widget": "text", "widget-id": "pula_id", "widget-type": "input", "widget-label": "pula_id",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.pula_id", "widget-data-validation": {"maxLength": 64}}'),
