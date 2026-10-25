@@ -34,18 +34,19 @@ ON CONFLICT ("tab_section_id") DO UPDATE SET
   "register_id" = EXCLUDED."register_id", "tab_id" = EXCLUDED."tab_id",
   "section_id" = EXCLUDED."section_id", "section_order" = EXCLUDED."section_order";
 
--- Split Personal Information into three adjacent sections. Identity keeps the
--- original order 10; Name and Personal details follow it before the photo,
--- location and socio-economic sections. The register's phone section moves
--- below these three in the explicit attachment below.
+-- Split Personal Information into three adjacent sections. The UI section-id
+-- is rewritten in 12_form_sections.sql because MultiSectionAccordionForms
+-- matches saves by UI section-id; copied upstream ids would collide.
 INSERT INTO "public"."g2p_register_ui_tab_sections" ("tab_section_id", "register_id", "tab_id", "section_id", "section_order")
-SELECT v.tab_section_id, v.register_id, v.tab_id, v.section_id, v.section_order
-FROM (VALUES
-  ('oan_farmer_name_register', 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd', 'farmer_farmer_tab', 'oan_farmer_name', 11),
-  ('oan_farmer_personal_details_register', 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd', 'farmer_farmer_tab', 'oan_farmer_personal_details', 12)
-) v(tab_section_id, register_id, tab_id, section_id, section_order)
+SELECT v.tab_section_id, t.register_id, t.tab_id, v.section_id, t.section_order + v.order_offset
+FROM "public"."g2p_register_ui_tab_sections" t
+JOIN (VALUES
+  ('oan_farmer_name_register', 'oan_farmer_name', 1),
+  ('oan_farmer_personal_details_register', 'oan_farmer_personal_details', 2)
+) v(tab_section_id, section_id, order_offset) ON true
 JOIN "public"."g2p_register_sections" s ON s.section_id = v.section_id
-JOIN "public"."g2p_register_ui_tabs" t ON t.tab_id = v.tab_id
+WHERE t.tab_id = 'farmer_farmer_tab'
+  AND t.section_id = 'oan_farmer_personal_identification'
 ON CONFLICT ("tab_section_id") DO UPDATE SET
   "register_id" = EXCLUDED."register_id", "tab_id" = EXCLUDED."tab_id",
   "section_id" = EXCLUDED."section_id", "section_order" = EXCLUDED."section_order";
@@ -72,12 +73,15 @@ ON CONFLICT ("tab_section_id") DO UPDATE SET
   "tab_id" = EXCLUDED."tab_id", "section_id" = EXCLUDED."section_id", "section_order" = EXCLUDED."section_order";
 
 INSERT INTO "public"."g2p_intake_form_ui_tab_sections" ("tab_section_id", "tab_id", "section_id", "section_order")
-SELECT v.tab_section_id, v.tab_id, v.section_id, v.section_order
-FROM (VALUES
-  ('oan_farmer_name_intake', 'a1a4d25a-1cd4-4356-abac-72482721', 'oan_farmer_name', 11),
-  ('oan_farmer_personal_details_intake', 'a1a4d25a-1cd4-4356-abac-72482721', 'oan_farmer_personal_details', 12)
-) v(tab_section_id, tab_id, section_id, section_order)
+SELECT v.tab_section_id, t.tab_id, v.section_id, t.section_order + v.order_offset
+FROM "public"."g2p_intake_form_ui_tab_sections" t
+JOIN (VALUES
+  ('oan_farmer_name_intake', 'oan_farmer_name', 1),
+  ('oan_farmer_personal_details_intake', 'oan_farmer_personal_details', 2)
+) v(tab_section_id, section_id, order_offset) ON true
 JOIN "public"."g2p_register_sections" s ON s.section_id = v.section_id
+WHERE t.tab_id = 'a1a4d25a-1cd4-4356-abac-72482721'
+  AND t.section_id = 'oan_farmer_personal_identification'
 ON CONFLICT ("tab_section_id") DO UPDATE SET
   "tab_id" = EXCLUDED."tab_id", "section_id" = EXCLUDED."section_id", "section_order" = EXCLUDED."section_order";
 

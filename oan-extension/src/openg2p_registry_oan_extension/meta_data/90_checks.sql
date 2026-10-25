@@ -148,4 +148,35 @@ BEGIN
   IF missing IS NOT NULL THEN
     RAISE EXCEPTION 'Personal Information sections are not placed on the Farmer intake tab: %', missing;
   END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM (
+      SELECT
+        max(section_order) FILTER (WHERE section_id = 'oan_farmer_personal_identification') AS identity_order,
+        max(section_order) FILTER (WHERE section_id = 'oan_farmer_name') AS name_order,
+        max(section_order) FILTER (WHERE section_id = 'oan_farmer_personal_details') AS details_order
+      FROM "public"."g2p_register_ui_tab_sections"
+      WHERE tab_id = 'farmer_farmer_tab'
+    ) o
+    WHERE NOT (identity_order < name_order AND name_order < details_order)
+  ) THEN
+    RAISE EXCEPTION 'Farmer register Personal Information sections are out of order';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM (
+      SELECT
+        max(section_order) FILTER (WHERE section_id = 'oan_farmer_personal_identification') AS identity_order,
+        max(section_order) FILTER (WHERE section_id = 'oan_farmer_name') AS name_order,
+        max(section_order) FILTER (WHERE section_id = 'oan_farmer_personal_details') AS details_order,
+        max(section_order) FILTER (WHERE section_id = 'oan_farmer_photo') AS photo_order
+      FROM "public"."g2p_intake_form_ui_tab_sections"
+      WHERE tab_id = 'a1a4d25a-1cd4-4356-abac-72482721'
+    ) o
+    WHERE NOT (identity_order < name_order AND name_order < details_order AND details_order < photo_order)
+  ) THEN
+    RAISE EXCEPTION 'Farmer intake Personal Information sections are out of order before photo';
+  END IF;
 END $$;

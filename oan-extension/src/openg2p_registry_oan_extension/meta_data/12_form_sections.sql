@@ -79,18 +79,10 @@ doc_widgets (col, ord, w) AS (
 ),
 form_layout (oan_section_id, upstream_section_id, col, ord, w) AS (
   VALUES
-  -- Personal identity, names and details are split into three OAN sections.
-  -- Personal identification keeps identifiers; column 1/order 1 is reserved
-  -- for the intake identity-verification widget.
-  -- Names retain the existing English, Amharic and primary-language widgets.
-  -- Personal details retain demographics, birth date and education.
-  -- Upstream's first, middle and last name are the
-  -- English first, father's and grandfather's name. The names in the primary
-  -- language appear once a language is chosen and are disabled when it is
-  -- Amharic (the last show or hide rule wins, so "chosen and not Amharic" is
-  -- two rules). The identifiers are attributes of the farmer: the Fayda FIN
-  -- (upstream's foundational_id), the Fayda RID, the ODK Farmer ID and the Pula
-  -- (Mavuno) ID.
+  -- Name: English, Amharic and primary-language names. Upstream's first,
+  -- middle and last name are the English first, father's and grandfather's
+  -- name. Primary-language fields appear after a language is chosen and are
+  -- disabled for Amharic.
   ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 1, 1,
    '{"widget-id": "first_name", "widget-label": "first_name_eng"}'::jsonb),
   ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 1, 2,
@@ -147,26 +139,27 @@ form_layout (oan_section_id, upstream_section_id, col, ord, w) AS (
        {"action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken", "operator": "equals", "value": "AMHARIC"}}]}}'),
   ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 2, 1, '{"widget-id": "marital_status"}'),
   ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 2, 2, '{"widget-id": "education_level"}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 2,
+   -- Identity: identifiers; column 1/order 1 stays open for intake auth.
+   ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 2,
    '{"widget": "boolean", "widget-id": "has_national_id", "widget-type": "input", "widget-label": "has_national_id",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.has_national_id",
      "widget-data-format": {"allowUnset": false, "booleanControlType": "radio", "booleanRepresentation": "yes-no"}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 3,
+   ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 2, 1,
    '{"widget": "text", "widget-id": "foundational_id", "widget-type": "input", "widget-label": "fayda_fin",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.foundational_id",
      "widget-data-validation": {"pattern": "^[0-9]{12}$", "patternMessage": "fayda_fin_format"}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 4,
+   ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 2, 2,
    '{"widget": "text", "widget-id": "rid", "widget-type": "input", "widget-label": "fayda_rid",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.rid",
      "widget-data-validation": {"pattern": "^[0-9]{29}$", "patternMessage": "fayda_rid_format"}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 5,
+   ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 3, 1,
    '{"widget": "text", "widget-id": "odk_farmer_id", "widget-type": "input", "widget-label": "odk_farmer_id",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.odk_farmer_id", "widget-data-validation": {"maxLength": 64}}'),
-  ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 1, 6,
+   ('oan_farmer_personal_identification', 'farmer_farmer_personal_identification_section_01', 3, 2,
    '{"widget": "text", "widget-id": "pula_id", "widget-type": "input", "widget-label": "pula_id",
      "widget-readonly": false, "widget-required": false,
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.pula_id", "widget-data-validation": {"maxLength": 64}}'),
