@@ -64,3 +64,72 @@ class FarmerPhoneService(Derivations, G2PRegisterDomainService):
 
     def construct_record_name(self, payload: dict, extra: list[str] | None = None) -> str:
         return " ".join([*(extra or []), _join(payload, ("phone_type", "phone_number"))]).strip() or "Phone"
+
+
+# Languages whose names the Name section asks itself: English is upstream's
+# first, middle and last name, Amharic the *_amh fields Fayda fills in.
+NAME_SECTION_LANGUAGES = {"ENGLISH", "AMHARIC"}
+OTHER_LANGUAGE = "OTHER"
+NAME_FIELDS = ("first_name", "middle_name", "last_name")
+
+
+def _language(code: str) -> str:
+    """AFAAN_OROMO as Afaan Oromo, for messages."""
+    return str(code).replace("_", " ").title()
+
+
+def _tidy(value):
+    return " ".join(str(value).split()) if not is_blank(value) else None
+
+
+class FarmerNameService(Derivations, G2PRegisterDomainService):
+    """A farmer's name in a language other than English and Amharic, one row
+    per language. Names are kept as typed, in any script; only spacing is
+    tidied. The farmer's other_language_names follow the rows, so the farmer
+    is found by them."""
+
+    async def validate_domain_attributes(self, records: list[dict]):
+        await self.derive(records)
+        seen = set()
+        for record in records:
+            language = record.get("language")
+            if is_blank(language):
+                validation_error("Language: a name row has no language. Choose the language the name is written in, or remove the row")
+            if language in NAME_SECTION_LANGUAGES:
+                validation_error(
+                    f"Language: {_language(language)} names go in the Name section, not in Names in Other Languages. "
+                    "Enter them there and remove this row")
+            if language == OTHER_LANGUAGE and is_blank(record.get("language_name")):
+                validation_error("Language Name: the row's language is Other. Enter the name of the language")
+            shown = record.get("language_name") if language == OTHER_LANGUAGE else _language(language)
+            if is_blank(record.get("first_name")):
+                validation_error(f"First Name: the {shown} name row has no first name. Enter it, or remove the row")
+            key = (language, str(record.get("language_name") or "").casefold())
+            if key in seen:
+                validation_error(f"Language: {shown} is listed twice. Keep one row for it and remove the other")
+            seen.add(key)
+
+    async def derive(self, records: list[dict]) -> None:
+        for record in records:
+            for field in (*NAME_FIELDS, "language_name"):
+                if field in record:
+                    record[field] = _tidy(record[field])
+            if "language" in record and record.get("language") != OTHER_LANGUAGE:
+                record["language_name"] = None
+
+    async def pre_approve(self, change_request, session):
+        await self.derive_payload(change_request, session)
+
+    async def post_approve(self, change_request, session):
+        await refresh_farmers_of(change_request, session)
+
+    async def post_ingest(self, register_id, register_row, session):
+        for field in NAME_FIELDS:
+            setattr(register_row, field, _tidy(getattr(register_row, field)))
+        await refresh_farmer(session, register_row.link_internal_record_id)
+
+    def construct_search_text(self, payload: dict, extra: list[str] | None = None) -> str:
+        return " ".join([*(extra or []), _join(payload, NAME_FIELDS)]).strip()
+
+    def construct_record_name(self, payload: dict, extra: list[str] | None = None) -> str:
+        return " ".join([*(extra or []), _join(payload, NAME_FIELDS)]).strip() or "Name"

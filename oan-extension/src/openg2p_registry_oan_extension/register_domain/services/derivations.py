@@ -109,9 +109,11 @@ def _farmer_record(record: dict) -> None:
 
 
 async def refresh_farmer(session, farmer_id: str | None) -> None:
-    """Land totals, phone list and household head of one farmer."""
+    """Land totals, phone list, names in other languages and household head of
+    one farmer."""
     from ..models import (
         G2PRegisterFarmer,
+        G2PRegisterFarmerName,
         G2PRegisterFarmerPhone,
         G2PRegisterHousehold,
         G2PRegisterLand,
@@ -144,6 +146,17 @@ async def refresh_farmer(session, farmer_id: str | None) -> None:
             for index, p in enumerate(phones)
         ]
         farmer.has_personal_phone = True
+
+    # The name rows are the source of other_language_names; core rebuilds the
+    # farmer's search_text from it when the farmer is saved.
+    names = (await session.execute(
+        select(G2PRegisterFarmerName.first_name, G2PRegisterFarmerName.middle_name, G2PRegisterFarmerName.last_name)
+        .where(G2PRegisterFarmerName.link_internal_record_id == farmer_id,
+               G2PRegisterFarmerName.record_status == "ACTIVE")
+        .order_by(G2PRegisterFarmerName.created_at)
+    )).all()
+    farmer.other_language_names = " ".join(
+        dict.fromkeys(part.strip() for row in names for part in row if part and part.strip())) or None
 
     household = (await session.get(G2PRegisterHousehold, farmer.link_internal_record_id)
                  if farmer.link_internal_record_id else None)

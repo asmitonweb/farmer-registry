@@ -22,7 +22,7 @@ from .identity_verification import (  # noqa: F401
     OANRegistrantAuthenticationService,
     install_identity_verification,
 )
-from .registers import FarmerPhoneService
+from .registers import FarmerNameService, FarmerPhoneService
 from .upstream_messages import reword
 from .widget_rules import Rules, _Say, check_record, collect_rules, normalize_record
 
@@ -148,6 +148,6 @@ for _name in dir(_farmer):
         globals()[_name] = _with_widget_rules(_name, _base)
 
 # OAN's own registers.
-for _name, _service in (("FarmerPhone", FarmerPhoneService),):
+for _name, _service in (("FarmerPhone", FarmerPhoneService), ("FarmerName", FarmerNameService)):
     globals()[_PREFIX + _name] = type(_PREFIX + _name, (WidgetRuleValidation, _service),
                                       {"__module__": __name__, "_upstream_validates": True})

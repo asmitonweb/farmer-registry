@@ -154,7 +154,7 @@ FARMER_SEARCH_FIELDS = (
     "functional_record_id", "foundational_id", "rid",
     "first_name", "middle_name", "last_name",
     "first_name_amh", "middle_name_amh", "last_name_amh",
-    "first_name_other", "middle_name_other", "last_name_other",
+    "other_language_names",
 )
 
 

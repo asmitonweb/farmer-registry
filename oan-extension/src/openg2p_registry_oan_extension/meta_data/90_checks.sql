@@ -10,7 +10,8 @@ BEGIN
   SELECT string_agg(f, ', ') INTO missing
   FROM (VALUES
     ('oan_farmer_name', 'first_name_amh'),
-    ('oan_farmer_name', 'last_name_other'),
+    ('oan_farmer_names', 'language'),
+    ('oan_farmer_names', 'first_name'),
     ('oan_farmer_name', 'language_spoken'),
     ('oan_farmer_personal_details', 'birth_date'),
     ('oan_farmer_photo', 'farmer-photo'),
@@ -68,7 +69,7 @@ BEGIN
   END IF;
 
   SELECT string_agg(section_id, ', ') INTO missing
-   FROM (VALUES ('oan_farmer_personal_identification'), ('oan_farmer_name'), ('oan_farmer_personal_details'),
+   FROM (VALUES ('oan_farmer_personal_identification'), ('oan_farmer_name'), ('oan_farmer_names'), ('oan_farmer_personal_details'),
                 ('oan_farmer_socio_economic_and_health'),
                ('oan_farmer_membership_details'), ('oan_farmer_lands'), ('oan_farmer_livestock'),
                ('oan_farmer_farm_inputs'), ('oan_farmer_household_lookup'), ('oan_household_information'),
@@ -80,7 +81,7 @@ BEGIN
   END IF;
 
   SELECT string_agg(section_id, ', ') INTO missing
-   FROM (VALUES ('oan_farmer_personal_identification'), ('oan_farmer_name'), ('oan_farmer_personal_details'),
+   FROM (VALUES ('oan_farmer_personal_identification'), ('oan_farmer_name'), ('oan_farmer_names'), ('oan_farmer_personal_details'),
                 ('oan_farmer_socio_economic_and_health'),
                ('oan_farmer_membership_details'), ('oan_farmer_lands'), ('oan_farmer_livestock_intake'),
                ('oan_farmer_farm_inputs_intake'), ('oan_farmer_photo'),

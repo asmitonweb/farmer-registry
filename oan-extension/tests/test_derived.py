@@ -100,3 +100,8 @@ def test_farmer_search_text_is_ids_and_names_only():
         "first_name": "Abebe", "middle_name": "Kebede", "last_name": "Tesfaye", "first_name_amh": "አበበ",
         "gender": "MALE", "birth_date": "1984-08-06", "education_level": "PRIMARY", "latitude": 14.4})
     assert text == "FR-1 121654377346 Abebe Kebede Tesfaye አበበ"
+
+
+def test_farmer_search_text_has_the_names_in_other_languages():
+    text = derived.farmer_search_text({"first_name": "Abebe", "other_language_names": "Caaltuu Gammachuu"})
+    assert text == "Abebe Caaltuu Gammachuu"

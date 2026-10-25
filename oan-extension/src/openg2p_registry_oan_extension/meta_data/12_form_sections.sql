@@ -79,10 +79,10 @@ doc_widgets (col, ord, w) AS (
 ),
 form_layout (oan_section_id, upstream_section_id, col, ord, w) AS (
   VALUES
-  -- Name: English, Amharic and primary-language names. Upstream's first,
-  -- middle and last name are the English first, father's and grandfather's
-  -- name. Primary-language fields appear after a language is chosen and are
-  -- disabled for Amharic.
+  -- Name: English and Amharic names, as Fayda has them, and the farmer's
+  -- primary language. Upstream's first, middle and last name are the English
+  -- first, father's and grandfather's name. Names in any other language are
+  -- the next section's rows (oan_farmer_names, 15_sections.sql).
   ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 1, 1,
    '{"widget-id": "first_name", "widget-label": "first_name_eng",
      "widget-data-options": {"action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_authentication_status", "operator": "equals", "value": "SUCCESS"}}}'::jsonb),
@@ -120,24 +120,6 @@ form_layout (oan_section_id, upstream_section_id, col, ord, w) AS (
      "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken",
      "widget-data-source": {"type": "api", "method": "POST", "params": {"attribute_id": "LANGUAGE"},
                             "service": "attributes", "endpoint": "values", "labelKey": "value_display", "valueKey": "value_code"}}'),
-  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 3, 1,
-   '{"widget": "text", "widget-id": "first_name_other", "widget-type": "input", "widget-label": "first_name_other",
-     "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.first_name_other", "widget-data-validation": {"maxLength": 100},
-     "widget-data-options": {"actions": [
-       {"action": "show", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken", "operator": "notEmpty"}},
-       {"action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken", "operator": "equals", "value": "AMHARIC"}}]}}'),
-  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 3, 2,
-   '{"widget": "text", "widget-id": "middle_name_other", "widget-type": "input", "widget-label": "fathers_name_other",
-     "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.middle_name_other", "widget-data-validation": {"maxLength": 100},
-     "widget-data-options": {"actions": [
-       {"action": "show", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken", "operator": "notEmpty"}},
-       {"action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken", "operator": "equals", "value": "AMHARIC"}}]}}'),
-  ('oan_farmer_name', 'farmer_farmer_personal_identification_section_01', 3, 3,
-   '{"widget": "text", "widget-id": "last_name_other", "widget-type": "input", "widget-label": "grandfathers_name_other",
-     "widget-data-path": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.last_name_other", "widget-data-validation": {"maxLength": 100},
-     "widget-data-options": {"actions": [
-       {"action": "show", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken", "operator": "notEmpty"}},
-       {"action": "disable", "condition": {"field": "a1a4d25a-1cd4-4356-abac-985a0b3c6bcd.language_spoken", "operator": "equals", "value": "AMHARIC"}}]}}'),
   ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 2, 1, '{"widget-id": "marital_status"}'),
   ('oan_farmer_personal_details', 'farmer_farmer_personal_identification_section_01', 2, 2, '{"widget-id": "education_level"}'),
   -- Identity, in the order it is filled in: whether the farmer has a national

@@ -2,6 +2,7 @@
 -- them.
 --
 --   oan_farmer_phones         the farmer's phone numbers (FarmerPhone)
+--   oan_farmer_names          the farmer's name in other languages (FarmerName)
 --   oan_farmer_land_summary   the farmer's land totals, derived, read only
 --   oan_farmer_enumerator     who collected the record, where and when, read
 --                             only: filled from the submission and the
@@ -9,8 +10,10 @@
 
 -- Sections of OAN's own, written out. A table section belongs to the child
 -- register (is_list); a read-only section has "section-editable": false.
--- Phone columns are not required: a required column makes the whole table
--- mandatory, and a phone is not required of every farmer.
+-- Phone and name columns are not required: a required column makes the whole
+-- table mandatory, and neither is required of every farmer. The server asks
+-- for a row's language and first name (services/registers.py). Names are any
+-- script, so they have no pattern, as OpenG2P advises for names.
 WITH sections (section_id, section_register_id, mnemonic, description, is_list, weightage, ui) AS (
   VALUES
   ('oan_farmer_phones', 'c4f1d8e2-7a9b-4c5d-8e6f-1a2b3c4d5e6f', 'oan_fr_farmer_phones', 'Farmer phone numbers', true, 5,
@@ -33,6 +36,27 @@ WITH sections (section_id, section_register_id, mnemonic, description, is_list, 
              "widget-data-validation": {"maxLength": 3}},
             {"widget": "boolean", "column-key": "is_primary", "widget-type": "input", "widget-label": "is_primary",
              "widget-readonly": false, "widget-data-path": "is_primary"}]}]}]}]}'),
+
+  ('oan_farmer_names', 'd2a7c3e4-5b6f-4a8e-9c1d-2e3f4a5b6c7d', 'oan_fr_farmer_names', 'Farmer names in other languages', true, 0,
+   '{"section-id": "farmer_names", "section-title": "other_language_names", "section-editable": true,
+     "panels": [{"panel-id": "oan_panel_names", "panel-orientation": "horizontal", "panels": [
+       {"panel-id": "oan_panel_names_table", "panel-column-span": 3, "panel-orientation": "vertical", "widgets": [
+         {"widget": "table", "widget-id": "names_table", "widget-type": "table", "widget-label": "other_language_names",
+          "widget-readonly": false, "widget-data-path": "d2a7c3e4-5b6f-4a8e-9c1d-2e3f4a5b6c7d.records",
+          "widget-data-add-label": "add_other_language_name", "widget-data-operations": {"add": true, "edit": true, "remove": true},
+          "widget-data-columns": [
+            {"widget": "select", "column-key": "language", "widget-type": "input", "widget-label": "name_language",
+             "widget-readonly": false, "widget-data-path": "language",
+             "widget-data-source": {"type": "api", "method": "POST", "params": {"attribute_id": "LANGUAGE"},
+                                    "service": "attributes", "endpoint": "values", "labelKey": "value_display", "valueKey": "value_code"}},
+            {"widget": "text", "column-key": "language_name", "widget-type": "input", "widget-label": "name_language_other",
+             "widget-readonly": false, "widget-data-path": "language_name", "widget-data-validation": {"maxLength": 50}},
+            {"widget": "text", "column-key": "first_name", "widget-type": "input", "widget-label": "first_name",
+             "widget-readonly": false, "widget-data-path": "first_name", "widget-data-validation": {"maxLength": 100}},
+            {"widget": "text", "column-key": "middle_name", "widget-type": "input", "widget-label": "fathers_name",
+             "widget-readonly": false, "widget-data-path": "middle_name", "widget-data-validation": {"maxLength": 100}},
+            {"widget": "text", "column-key": "last_name", "widget-type": "input", "widget-label": "grandfathers_name",
+             "widget-readonly": false, "widget-data-path": "last_name", "widget-data-validation": {"maxLength": 100}}]}]}]}]}'),
 
   ('oan_farmer_land_summary', 'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd', 'oan_fr_farmer_land_summary', 'Farmer land totals', false, 0,
    '{"section-id": "farmer_land_summary", "section-title": "land_summary", "section-editable": false,

@@ -6,8 +6,11 @@ from openg2p_registry_farmer_extension.register_domain.schemas import *
 
 from ..fields import OAN_FIELDS
 from .registers import (  # noqa: F401  re-exported for core
+    G2PIntakeFormSchemaFarmerName,
     G2PIntakeFormSchemaFarmerPhone,
+    G2PRegisterHistorySchemaFarmerName,
     G2PRegisterHistorySchemaFarmerPhone,
+    G2PRegisterSchemaFarmerName,
     G2PRegisterSchemaFarmerPhone,
 )
 

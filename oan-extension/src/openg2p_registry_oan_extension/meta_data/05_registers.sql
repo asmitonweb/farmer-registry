@@ -1,7 +1,9 @@
--- OAN's own register: the farmer's phone numbers, a child TABLE register of the
--- Farmer defined the way the farmer seed defines Land or Livestock. Its tables
--- are created by the OAN initializer (app.py, OAN_REGISTERS), its section is in
--- 15_sections.sql. The id is the previous farmer registry's.
+-- OAN's own registers, child TABLE registers of the Farmer defined the way the
+-- farmer seed defines Land or Livestock: the farmer's phone numbers (the id is
+-- the previous farmer registry's), and the farmer's name in languages other
+-- than English and Amharic, one row per language (OpenG2P's pattern for an
+-- open-ended set of languages). Their tables are created by the OAN
+-- initializer (app.py, OAN_REGISTERS), their sections are in 15_sections.sql.
 --
 -- The farmer's identifiers are not a register or a section: the Fayda FIN is
 -- upstream's foundational_id, and the RID, ODK Farmer ID and Pula ID are
@@ -16,6 +18,9 @@ INSERT INTO "public"."g2p_register_definitions" (
 VALUES
   ('c4f1d8e2-7a9b-4c5d-8e6f-1a2b3c4d5e6f', 'FarmerPhone', 'Farmer Phones', 'Farmer Phone Register',
    'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd', 12, false, 'TABLE', NULL, NULL, NULL, false, false, 0, false,
+   false, false, 730, 30),
+  ('d2a7c3e4-5b6f-4a8e-9c1d-2e3f4a5b6c7d', 'FarmerName', 'Farmer Names', 'Farmer Names in Other Languages Register',
+   'a1a4d25a-1cd4-4356-abac-985a0b3c6bcd', 13, false, 'TABLE', NULL, NULL, NULL, false, false, 0, false,
    false, false, 730, 30)
 ON CONFLICT ("register_id") DO UPDATE SET
   "register_mnemonic" = EXCLUDED."register_mnemonic", "register_subject" = EXCLUDED."register_subject",
@@ -28,7 +33,13 @@ VALUES
    '[{"field_name": "phone_type", "display_label": "Phone Type", "order": 1},
      {"field_name": "phone_number", "display_label": "Phone Number", "order": 2},
      {"field_name": "is_primary", "display_label": "Primary", "order": 3}]',
-   '[{"field_name": "phone_number", "display_label": "Phone Number", "filter_type": "text", "order": 1, "allowed_operators": ["eq", "contains"]}]')
+   '[{"field_name": "phone_number", "display_label": "Phone Number", "filter_type": "text", "order": 1, "allowed_operators": ["eq", "contains"]}]'),
+  ('d2a7c3e4-5b6f-4a8e-9c1d-2e3f4a5b6c7d', '[]',
+   '[{"field_name": "language", "display_label": "Language", "order": 1},
+     {"field_name": "first_name", "display_label": "First Name", "order": 2},
+     {"field_name": "middle_name", "display_label": "Father''s Name", "order": 3},
+     {"field_name": "last_name", "display_label": "Grandfather''s Name", "order": 4}]',
+   '[{"field_name": "first_name", "display_label": "First Name", "filter_type": "text", "order": 1, "allowed_operators": ["eq", "contains"]}]')
 ON CONFLICT ("register_id") DO UPDATE SET
   "deduplicate_schema" = EXCLUDED."deduplicate_schema", "search_result_schema" = EXCLUDED."search_result_schema",
   "filter_schema" = EXCLUDED."filter_schema";

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {
     getValueByPath,
@@ -68,6 +69,12 @@ function popupFeatures(width: number, height: number): string {
  *   widget-data-options: {registerId, foundationalIdPath, internalRecordIdPath,
  *                         fieldPrefix (the register's data path prefix),
  *                         popupWidth, popupHeight}
+ *
+ * The status stays on the widget's row; the Verify button goes in the
+ * section's footer, before Previous and Next, so the FIN can be typed and
+ * saved either way and verifying is the section's own action. The layout has
+ * no slot there, so the button is portalled into the footer of the section
+ * this widget is in, and stays on the row when no footer is found.
  */
 export function IdentityVerificationWidget({ config }: { config: Config }) {
     const dispatch = useDispatch();
@@ -112,6 +119,24 @@ export function IdentityVerificationWidget({ config }: { config: Config }) {
     const [verifiedFin, setVerifiedFin] = useState<string | null>(null);
     const popup = useRef<Window | null>(null);
     const timer = useRef<number | null>(null);
+    const root = useRef<HTMLDivElement | null>(null);
+    const [footer, setFooter] = useState<HTMLElement | null>(null);
+
+    useEffect(() => {
+        const controls = root.current
+            ?.closest('.intake-form-accordion-content')
+            ?.querySelector<HTMLElement>('.intake-form-edit-controls');
+        if (!controls) return undefined;
+        const host = document.createElement('span');
+        host.className = 'oan-idv-footer-action';
+        host.style.display = 'contents';
+        controls.prepend(host);
+        setFooter(host);
+        return () => {
+            host.remove();
+            setFooter(null);
+        };
+    }, []);
 
     const stop = useCallback(() => {
         if (timer.current) window.clearTimeout(timer.current);
@@ -242,8 +267,27 @@ export function IdentityVerificationWidget({ config }: { config: Config }) {
         ? 'var(--owt-color-success)'
         : problem ? 'var(--owt-color-danger)' : 'var(--owt-color-text-muted)';
 
+    const button = readonly ? null : (
+        <button
+            type="button"
+            className="owt-btn owt-btn-primary text-sm px-4 py-1.5 rounded-[var(--owt-btn-border-radius)] disabled:opacity-50"
+            style={{
+                background: 'var(--owt-color-primary)',
+                color: 'var(--owt-color-bg)',
+                border: '1px solid var(--owt-btn-primary-border)',
+            }}
+            onClick={verify}
+            // Enabled without a FIN too: a click then says to enter it,
+            // where a disabled button would do nothing and say nothing.
+            disabled={busy}
+        >
+            {say(verified ? 'oan_idv_verify_again' : 'oan_idv_verify')}
+        </button>
+    );
+
     return (
-        <div className="mb-[10px]">
+        <div ref={root} className="mb-[10px]">
+            {button && footer && createPortal(button, footer)}
             <div className="flex flex-col sm:flex-row sm:items-start">
                 <label
                     className="flex items-baseline min-w-0 max-w-full owt-field-label text-base font-medium md:min-w-[120px] sm:pr-4 sm:pt-1 mb-1 sm:mb-0"
@@ -261,23 +305,7 @@ export function IdentityVerificationWidget({ config }: { config: Config }) {
                             <span aria-hidden className="inline-block w-2 h-2 rounded-full" style={{ background: tone }} />
                             {status}
                         </span>
-                        {!readonly && (
-                            <button
-                                type="button"
-                                className="owt-btn owt-btn-primary text-sm px-4 py-1.5 rounded-[var(--owt-btn-border-radius)] disabled:opacity-50"
-                                style={{
-                                    background: 'var(--owt-color-primary)',
-                                    color: 'var(--owt-color-bg)',
-                                    border: '1px solid var(--owt-btn-primary-border)',
-                                }}
-                                onClick={verify}
-                                // Enabled without a FIN too: a click then says to enter it,
-                                // where a disabled button would do nothing and say nothing.
-                                disabled={busy}
-                            >
-                                {say(verified ? 'oan_idv_verify_again' : 'oan_idv_verify')}
-                            </button>
-                        )}
+                        {button && !footer && button}
                     </div>
                     {finChanged && <span className="text-xs" style={{ color: 'var(--owt-widget-error-color)' }}>{say('oan_idv_fin_changed')}</span>}
                     {problem && !busy && <span className="text-xs" style={{ color: 'var(--owt-widget-error-color)' }}>{problem}</span>}

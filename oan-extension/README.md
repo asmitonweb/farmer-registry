@@ -9,10 +9,10 @@ platform's Extensions Contract describes for coexisting extensions.
 | Path | Holds |
 |---|---|
 | `register_domain/fields.py` | the OAN columns on the farmer registers, declared once |
-| `register_domain/models/`, `schemas/` | append those columns to the farmer models and schemas; OAN's own register, FarmerPhone (`registers.py`) |
+| `register_domain/models/`, `schemas/` | append those columns to the farmer models and schemas; OAN's own registers, FarmerPhone and FarmerName (`registers.py`) |
 | `register_domain/derived.py` | the values derived rather than typed (land totals in hectares, location names, Ethiopian calendar dates, phone numbers, the farmer's search text), with no framework imports |
 | `register_domain/ethiopian_calendar.py` | Gregorian and Ethiopian calendar conversion |
-| `register_domain/services/` | the farmer domain services, each extended with the derived values (`derivations.py`) and the section widgets' value rules (`widget_rules.py`); the FarmerPhone service |
+| `register_domain/services/` | the farmer domain services, each extended with the derived values (`derivations.py`) and the section widgets' value rules (`widget_rules.py`); the FarmerPhone and FarmerName services |
 | `app.py` | the farmer initializer, plus migration of OAN registers |
 | `meta_data/` | the `oan_` metadata layer, applied after the farmer's (`/seed/meta_data/zz-oan/`) |
 | `seed/` | the db-seed entrypoint: sample people come from Master Data (the country pack's `samples/`) instead of the Kamuntu demo files; `OAN_SAMPLES_FROM_MASTER_DATA=false` keeps the farmer seed's own |
@@ -191,7 +191,7 @@ Each file runs after the whole farmer seed, in name order:
 
 | File | Does |
 |---|---|
-| `05_registers.sql` | the FarmerPhone register, the location names in the farmer list, and Fayda verification for the Farmer register |
+| `05_registers.sql` | the FarmerPhone and FarmerName registers, the location names in the farmer list, and Fayda verification for the Farmer register |
 | `10_sections.sql` | the table sections: each upstream one with OAN columns added, so upstream changes carry over on the next seed; the household link and the intake photo section |
 | `12_form_sections.sql` | the form sections as one row of three columns: which widget goes where, upstream's by `widget-id` and OAN's written out (personal identification, socio-economic, membership, household, location, documents) |
 | `15_sections.sql` | sections with no upstream counterpart: phones, land totals, enumerator |
@@ -214,7 +214,7 @@ name; these map:
 |---|---|
 | `given_name`, `family_name`, `gf_name_eng` | `first_name`, `middle_name`, `last_name` |
 | `*_amh` (Gen1 `first_name_amh`, `family_name_amh`, `gf_name_amh`) | `first_name_amh`, `middle_name_amh`, `last_name_amh` |
-| `*_other`; COSS `*_om` (Afaan Oromo) | `*_other`, with `language_spoken` = `AFAAN_OROMO` for `*_om` |
+| `*_other`; COSS `*_om` (Afaan Oromo) | a FarmerName row: `language` from the record's language (`AFAAN_OROMO` for `*_om`), `first_name`, `middle_name`, `last_name` |
 | `birthdate_ec`, `collected_ec`, `expiry_date_ec` | derived again from the Gregorian date (`*_ec`) |
 | `age` | `estimated_age` |
 | `is_disabled` | `disabled` |

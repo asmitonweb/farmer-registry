@@ -17,6 +17,7 @@ _logger = logging.getLogger(_config.logging_default_logger_name)
 # OAN registers, in parent-before-child order: (register, history, intake form).
 OAN_REGISTERS: list[tuple] = [
     (_oan_models.G2PRegisterFarmerPhone, _oan_models.G2PRegisterHistoryFarmerPhone, _oan_models.G2PIntakeFormFarmerPhone),
+    (_oan_models.G2PRegisterFarmerName, _oan_models.G2PRegisterHistoryFarmerName, _oan_models.G2PIntakeFormFarmerName),
 ]
 
 
