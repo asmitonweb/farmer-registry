@@ -107,7 +107,9 @@ slot; a saved document keeps its slot, since it is stored under that label.
 
 ### Fayda verification during intake
 
-The FIN is typed in Personal identification; **Verify with Fayda** opens the
+Current FIN-once behavior and native completion bridge: [fin-once.md](docs/fin-once.md).
+
+The FIN is entered only on eSignet; **Verify with Fayda** opens the
 Fayda (eSignet) sign-in in a pop-up. When the farmer has signed in, the names,
 gender and birth date Fayda holds are filled in on the form and can no longer be
 changed. Test identities are picked in the pop-up (eSignet with the mock

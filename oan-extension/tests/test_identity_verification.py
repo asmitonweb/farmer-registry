@@ -127,7 +127,7 @@ def test_an_expired_verification_is_not_accepted():
     assert "has expired" in _check(service, [{"identity_verification_id": "v-1", "foundational_id": FIN}])[0]
 
 
-def test_the_transaction_context_gets_the_fin_from_the_form():
+def test_the_transaction_context_preserves_the_server_expected_fin():
     created = {}
 
     class Store:
