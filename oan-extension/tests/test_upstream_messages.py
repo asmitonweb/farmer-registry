@@ -15,6 +15,39 @@ upstream_messages = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(upstream_messages)
 reword = upstream_messages.reword
 
+
+def test_core_attribute_choice_names_field_and_fix():
+    text = "record 0: gender='unknown' is not a value of GENDER (permitted: FEMALE, MALE)"
+    assert reword(text, {"gender": "Gender"}) == 'Gender: "unknown" is not one of the choices. Pick one from the list.'
+
+
+def test_core_attribute_problems_join_without_splitting_quoted_values():
+    text = (
+        "record 0: gender='bad; choice' is not a value of GENDER (permitted: FEMALE, MALE); "
+        'record 1: education_level="not valid" is not a value of EDUCATION_LEVEL (permitted: PRIMARY)'
+    )
+    assert reword(text, {"gender": "Gender", "education_level": "Education Level"}) == (
+        'Gender: "bad; choice" is not one of the choices. Pick one from the list.; '
+        'Education Level: "not valid" is not one of the choices. Pick one from the list.'
+    )
+
+
+def test_core_missing_master_data_is_actionable():
+    text = "Attribute validation is enabled, but Master Data has no attribute values configured"
+    assert reword(text) == upstream_messages.MDS_UNAVAILABLE
+    assert "Retry" in reword(text) and "support" in reword(text)
+
+
+def test_core_mds_transport_failure_does_not_expose_transport_details():
+    text = "Master Data API request failed: /attributes/get_attribute_values (HTTP 503)"
+    assert reword(text) == upstream_messages.MDS_UNAVAILABLE
+
+
+def test_core_choice_message_uses_translation():
+    text = "record 0: gender='unknown' is not a value of GENDER (permitted: MALE)"
+    assert reword(text, {"gender": "Gender", "oan_up_mds_option": "{label}: select a listed value instead of {value}."}) == (
+        "Gender: select a listed value instead of unknown.")
+
 # Upstream messages that already say what to do, so they are not reworded.
 ALREADY_EXPLAINED = (
     "were entered; the members must match the size of the group",

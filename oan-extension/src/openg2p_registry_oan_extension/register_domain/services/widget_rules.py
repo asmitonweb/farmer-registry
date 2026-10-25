@@ -51,6 +51,8 @@ MESSAGES = {
     "oan_rule_date": "{label}: \"{value}\" is not a date. Pick the date from the calendar (DD/MM/YYYY).",
     "oan_rule_option": "{label}: \"{value}\" is not one of the choices. Pick one from the list.",
     "oan_rule_required": "{label}: this is required. Fill it in on every row before saving.",
+    "oan_rule_year_range": "{label}: enter a whole year from 1900 to {year}, or leave it empty.",
+    "oan_rule_future_date": "{label}: the date is in the future. Choose today or an earlier date.",
 }
 
 _TYPES = {

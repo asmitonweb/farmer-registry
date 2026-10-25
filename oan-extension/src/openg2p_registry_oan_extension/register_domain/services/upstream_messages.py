@@ -13,9 +13,15 @@ A message with no entry, which already says what to do, is left as it is.
 This module has no database or framework imports, so it can be tested alone.
 """
 
+import ast
 import re
 
+MDS_UNAVAILABLE = "Master Data Service: reference choices are unavailable. Retry after the service is restored, or contact support."
+
 REWORDED: list[tuple[str, str, str]] = [
+    ("oan_up_mds_unavailable",
+     r"(?:Attribute validation is enabled, but Master Data has no attribute values configured|Master Data API request failed: .+)",
+     MDS_UNAVAILABLE),
     ("oan_up_birth_date_future", r"birth_date must not be in the future",
      "Birth Date: the date is in the future. Enter the real birth date, today or earlier."),
     ("oan_up_planted_date_future", r"planted_date must not be in the future",
@@ -73,6 +79,8 @@ REWORDED: list[tuple[str, str, str]] = [
 ]
 
 _COMPILED = [(key, re.compile(pattern), text) for key, pattern, text in REWORDED]
+_MDS_OPTION = re.compile(
+    r'''record \d+: (\w+)=('(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*") is not a value of (\S+) \(permitted: [^)]*\)''')
 
 
 def _label(name: str, messages: dict[str, str]) -> str:
@@ -84,6 +92,24 @@ def _label(name: str, messages: dict[str, str]) -> str:
 def reword(message: str, messages: dict[str, str] | None = None) -> str:
     """The OAN wording of one upstream message, or the message unchanged."""
     messages = messages or {}
+    # Core joins independently generated problems with '; '. Parse its quoted
+    # repr values before splitting, so punctuation inside a value is preserved.
+    core_message = message.strip()
+    parts, end = [], 0
+    for match in _MDS_OPTION.finditer(core_message):
+        if core_message[end:match.start()] not in ("", "; "):
+            break
+        field, quoted, _ = match.groups()
+        value = ast.literal_eval(quoted)
+        english = '{label}: "{value}" is not one of the choices. Pick one from the list.'
+        template = messages.get("oan_up_mds_option") or english
+        try:
+            parts.append(template.format(label=_label(field, messages), value=value))
+        except (AttributeError, IndexError, KeyError, ValueError):
+            parts.append(english.format(label=_label(field, messages), value=value))
+        end = match.end()
+    if parts and end == len(core_message):
+        return "; ".join(parts)
     for key, pattern, english in _COMPILED:
         match = pattern.fullmatch(message.strip())
         if not match:

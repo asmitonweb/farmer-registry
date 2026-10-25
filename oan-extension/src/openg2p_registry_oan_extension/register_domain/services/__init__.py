@@ -16,6 +16,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from .derivations import DERIVATIONS, Derivations
+from .domain_bounds import check_domain_bounds
 from .household_intake import install_farmer_household_check  # noqa: F401
 from .identity_verification import (  # noqa: F401
     OANRegistrantAuthenticationService,
@@ -94,6 +95,8 @@ class WidgetRuleValidation:
             for record in records:
                 normalize_record(record, field_rules)
             problems = [p for record in records for p in check_record(record, field_rules, messages)]
+        say = _Say(messages)
+        problems += check_domain_bounds(records, self.register_mnemonic(), field_rules, say)
         if not problems and type(self)._verifies_identity:
             # The Fayda verification, once the values themselves are right.
             say = _Say(messages)
