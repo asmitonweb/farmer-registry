@@ -12,8 +12,8 @@ def profile():
     return json.loads(Path(__file__).with_name('oan-chart.json').read_text(encoding='utf-8'))
 
 
-def verify(path):
-    pin = profile()
+def verify(path, pin=None):
+    pin = profile() if pin is None else pin
     if hashlib.sha256(Path(path).read_bytes()).hexdigest() != pin['sha256']:
         raise ValueError('OAN chart checksum mismatch')
     with tarfile.open(path, 'r:gz') as archive:
@@ -32,10 +32,17 @@ def verify(path):
     return pin
 
 
-def defaults(path):
-    verify(path)
+def require_deployable(environment):
+    pin = profile()
+    if environment != 'dev' or pin.get('environment') != environment:
+        raise ValueError('Deployment blocked: the pinned OAN chart is for another environment')
+
+
+def defaults(path, pin=None):
+    pin = profile() if pin is None else pin
+    verify(path, pin)
     with tarfile.open(path, 'r:gz') as archive:
-        prefix = profile()['name'] + '/'
+        prefix = pin['name'] + '/'
         child = yaml.safe_load(archive.extractfile(prefix + 'charts/openg2p-registry/values.yaml'))
         parent = yaml.safe_load(archive.extractfile(prefix + 'values.yaml'))
     from deployment import merge
@@ -49,6 +56,9 @@ if __name__ == '__main__':
         if sys.argv[1] == 'url':
             pin = profile()
             print(pin['repository'] + pin['name'] + '-' + pin['version'] + '.tgz')
+        elif sys.argv[1] == 'require-deployable':
+            require_deployable(sys.argv[2])
+            print('PASS: registry promotion evidence accepted')
         elif sys.argv[1] == 'verify':
             verify(sys.argv[2])
             print('PASS: approved OAN chart archive and packaged platform')

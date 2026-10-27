@@ -102,13 +102,13 @@ def envs(d, include_init=True):
     return result
 
 
-def reconcile_dev(values, before):
+def reconcile_dev(values, before, chart_pin=None):
     """Carry installed literals and references through the chart's public values."""
     old = index(before)
     packaged = {}
     if os.environ.get('OAN_CHART_ARCHIVE'):
         from oan_chart import defaults
-        packaged = defaults(os.environ['OAN_CHART_ARCHIVE'])
+        packaged = defaults(os.environ['OAN_CHART_ARCHIVE'], chart_pin)
     for component, (kind, suffix, _) in COMPONENTS.items():
         if kind != 'Deployment':
             continue
@@ -214,6 +214,13 @@ def outgestion_env(suffix, environment="dev"):
     return outgestion_overlay(environment).get("registry", {}).get(component, {}).get("envVars", {})
 
 
+def registrant_auth_overlay(environment="dev"):
+    """Fayda (eSignet) verification for the farmer register; New Dev only."""
+    if environment != "dev":
+        return {}
+    return load(Path(__file__).resolve().parents[2] / "helm/environments/dev/registry-registrant-auth.yaml")
+
+
 def merge(target, overlay):
     for key, value in overlay.items():
         if isinstance(value, dict) and isinstance(target.get(key), dict):
@@ -222,7 +229,7 @@ def merge(target, overlay):
             target[key] = copy.deepcopy(value)
 
 
-def prepare(values, before, registry, tag, migrate_identity=False, environment="dev", images=None):
+def prepare(values, before, registry, tag, migrate_identity=False, environment="dev", images=None, chart_pin=None):
     root = image_root(registry, tag)
     old = index(before, environment)
     if ("Deployment", RELEASE + "-staff-portal-api") not in old:
@@ -236,7 +243,10 @@ def prepare(values, before, registry, tag, migrate_identity=False, environment="
                          else "Registry hostname does not match staging")
     config = values.setdefault("registry", {})
     if environment == 'dev':
-        reconcile_dev(values, before)
+        if chart_pin is None:
+            reconcile_dev(values, before)
+        else:
+            reconcile_dev(values, before, chart_pin)
     # Some installed dev gateways are in the release manifest but absent from
     # saved values. Carry them into rc.544's owning values instead of falling
     # back to "internal"; validate still requires the whole route unchanged.
@@ -300,6 +310,7 @@ def prepare(values, before, registry, tag, migrate_identity=False, environment="
     # Qualify the Commons service explicitly across namespace boundaries.
     merge(values, location_overlay(environment))
     merge(values, outgestion_overlay(environment))
+    merge(values, registrant_auth_overlay(environment))
     if environment == "staging":
         # rc.544 stopped emitting legacy MDS DB settings and two UI toggles.
         # Carry their exact installed values/Secret refs through the owning
@@ -430,7 +441,11 @@ def validate(before, after, registry, tag, migrate_identity=False, environment="
                 if current.get(name) != env_entry(name, value):
                     raise ValueError(f"Staging staff identity was not rendered: {suffix}/{name}")
     for key, d in new.items():
-        if environment == 'dev' and key not in old and key[0] != 'Job':
+        # Hook resources (a Job and the ServiceAccount, Role, ConfigMap it
+        # runs with) are recreated on every install/upgrade; only a new
+        # resource that would persist needs a reviewed baseline.
+        is_hook = key[0] == 'Job' or bool(d.get('metadata', {}).get('annotations', {}).get('helm.sh/hook'))
+        if environment == 'dev' and key not in old and not is_hook:
             raise ValueError(f'Unexpected persistent resource: {key}')
         if key[1].startswith(("commons-", "farmer-connector")):
             raise ValueError(f"Registry must not own shared/connector resource: {key}")

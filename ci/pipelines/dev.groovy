@@ -14,7 +14,9 @@ pipeline {
         HELM_NAMESPACE = 'farmer'
     }
     parameters {
-        booleanParam(name: 'COORDINATE_SERVICES', defaultValue: true,
+        choice(name: 'NEW_DEV_DELIVERY_ACTION', choices: ['publish-only', 'deploy', 'fresh-install'],
+            description: 'publish-only builds and pushes the images. deploy upgrades the existing New Dev release with them. fresh-install backs up the New Dev registry databases, uninstalls the release, drops the databases and installs the pinned chart again on an empty database (all New Dev farmer data is lost; Commons is untouched).')
+        booleanParam(name: 'COORDINATE_SERVICES', defaultValue: false,
             description: 'Build and independently upgrade available optional services; failures mark UNSTABLE.')
         booleanParam(name: 'APPLY_COMMONS_IDENTITY', defaultValue: false,
             description: 'Apply reviewed Commons staff identity values; requires fresh farmer-dev-identity-evidence credential.')
@@ -33,6 +35,10 @@ pipeline {
                     }
                     env.IMAGE_TAG = commit.take(12)
                     env.SOURCE_COMMIT = commit
+                    // Branch-index builds may not yet have the new parameters.
+                    // Resolve that case to publication, never cluster mutation.
+                    env.OAN_DELIVERY_ACTION = sh(returnStdout: true,
+                        script: 'python3 ci/delivery.py action').trim()
                 }
                 sh '''
                     set -eu
@@ -47,17 +53,7 @@ pipeline {
             steps {
                 sh '''
                     set -eu
-                    for component in staff-api partner-api celery db-seed sanity-tests staff-ui; do
-                      docker build -f "docker/$component/Dockerfile" -t "coss-ci/$component:$IMAGE_TAG" .
-                    done
-                    docker run --rm --network none --entrypoint python -v "$PWD:/repo:ro" \
-                      "coss-ci/celery:$IMAGE_TAG" /repo/tests/runtime/odk_actor_worker_runtime.py
-                    docker run --rm --network none --entrypoint python -v "$PWD:/repo:ro" \
-                      "coss-ci/partner-api:$IMAGE_TAG" /repo/tests/runtime/odk_signature_runtime.py
-                    docker run --rm -v "$PWD:/repo:ro" -e PYTHONPATH=/repo/farmer-extension/src -w /repo/tests/runtime \
-                      --entrypoint python "coss-ci/staff-api:$IMAGE_TAG" -m unittest \
-                      extension.test_domain_validation_utils extension.test_farmer_geo_sync \
-                      extension.test_intake_record_image_urls extension.test_household_family_size
+                    bash ci/build/images.sh "$IMAGE_TAG"
                 '''
             }
         }
@@ -93,20 +89,25 @@ pipeline {
                             --query 'imageDetails[0].imageDigest' --output text)
                           printf '%s\t%s\t%s\n' "$component" "$image" "$digest" >> service-outcomes/registry-images.tsv
                         done
+                        docker run --rm --network none --user "$(id -u):$(id -g)" \
+                          -e NEW_DEV_DELIVERY_ACTION -e OAN_DELIVERY_ACTION \
+                          -e ECR_REGISTRY -e IMAGE_TAG -e SOURCE_COMMIT \
+                          -v "$PWD:/repo" "coss-ci/validation:$IMAGE_TAG" \
+                          python ci/delivery.py publication service-outcomes/publication.json
                     '''
                 }
             }
         }
         stage('Prepare dev deployment') {
-            when { allOf { branch 'develop'; not { changeRequest() } } }
+            when { allOf { branch 'develop'; not { changeRequest() }; expression { env.OAN_DELIVERY_ACTION != 'publish-only' } } }
             steps {
-                stash name: 'dev-deployment', includes: 'helm/**,ci/**,scripts/**,integrations/**,tests/runtime/**,service-outcomes/**', excludes: 'helm/**/charts/**', useDefaultExcludes: false
+                stash name: 'dev-deployment', includes: 'helm/**,ci/**,scripts/**,integrations/**,tests/runtime/**,service-outcomes/**,oan-extension/**,farmer-extension/**,ui/staff-ui/overrides/**,docker/oan/**,docker/sanity-tests/**,test/sanity/**', excludes: 'helm/**/charts/**,**/__pycache__/**,**/.pytest_cache/**', useDefaultExcludes: false
             }
         }
         stage('Deploy new dev') {
             when {
                 beforeAgent true
-                allOf { branch 'develop'; not { changeRequest() } }
+                allOf { branch 'develop'; not { changeRequest() }; expression { env.OAN_DELIVERY_ACTION in ['deploy', 'fresh-install'] } }
             }
             agent { label 'vpn-agent2' }
             steps {
@@ -117,12 +118,24 @@ pipeline {
                         script {
                           def deployRegistry = {
                             try {
-                              sh '''
+                              if (env.OAN_DELIVERY_ACTION == 'fresh-install') {
+                                // The database backups go to the New Dev box over the existing backup key.
+                                withCredentials([sshUserPrivateKey(credentialsId: 'farmer-new-dev-backup-ssh', keyFileVariable: 'BACKUP_SSH_KEY')]) {
+                                  sh '''
+                            set -eu
+                            export REGISTRY_OUTCOME_FILE="$PWD/service-outcomes/registry.json"
+                            docker build -t "coss-ci/validation:$IMAGE_TAG" ci/validation
+                            bash ci/deploy/fresh-install-dev.sh
+                            '''
+                                }
+                              } else {
+                                sh '''
                             set -eu
                             export REGISTRY_OUTCOME_FILE="$PWD/service-outcomes/registry.json"
                             docker build -t "coss-ci/validation:$IMAGE_TAG" ci/validation
                             bash ci/deploy/deploy-dev.sh
                             '''
+                              }
                             } finally {
                               // Retain sanitized failure provenance on the VPN agent too.
                               archiveArtifacts artifacts: 'service-outcomes/*.json,service-outcomes/*.tsv', allowEmptyArchive: true
@@ -144,7 +157,7 @@ pipeline {
             }
         }
         stage('Build optional services') {
-            when { allOf { branch 'develop'; not { changeRequest() }; expression { params.COORDINATE_SERVICES } } }
+            when { allOf { branch 'develop'; not { changeRequest() }; expression { env.OAN_DELIVERY_ACTION == 'deploy' && params.COORDINATE_SERVICES } } }
             steps {
                 catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE', catchInterruptions: false) {
                     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-creds']]) {
@@ -162,7 +175,7 @@ pipeline {
         stage('Deploy optional services') {
             when {
                 beforeAgent true
-                allOf { branch 'develop'; not { changeRequest() }; expression { params.COORDINATE_SERVICES } }
+                allOf { branch 'develop'; not { changeRequest() }; expression { env.OAN_DELIVERY_ACTION == 'deploy' && params.COORDINATE_SERVICES } }
             }
             agent { label 'vpn-agent2' }
             steps {
@@ -196,6 +209,7 @@ pipeline {
     post {
         always {
             archiveArtifacts artifacts: 'service-outcomes/*.json,service-outcomes/*.tsv', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'ci-output/native-worker-save/**', allowEmptyArchive: true
         }
     }
 }

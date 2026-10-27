@@ -120,14 +120,17 @@ def test_safe_existing_release_upgrade(release):
     deployment.validate(*release, ECR, TAG)
 
 
-def test_existing_hook_configmap_identity_must_be_in_the_preflight_baseline(release):
+def test_new_hook_resources_are_accepted_but_new_persistent_ones_need_a_baseline(release):
     before, after = release
-    hook = {'kind': 'ConfigMap', 'metadata': {'name': 'farmer-registry-registry-iam-register-payload',
-            'annotations': {'helm.sh/hook': 'post-install,post-upgrade'}}, 'data': {'payload': 'render-only'}}
-    after.append(copy.deepcopy(hook))
+    for kind in ('ConfigMap', 'ServiceAccount', 'Role', 'RoleBinding'):
+        after.append({'kind': kind, 'metadata': {'name': 'farmer-registry-registrant-auth',
+                      'annotations': {'helm.sh/hook': 'post-install,post-upgrade'}}})
+    deployment.validate(before, after, ECR, TAG)
+    persistent = {'kind': 'ConfigMap', 'metadata': {'name': 'farmer-registry-new-settings'}, 'data': {'a': '1'}}
+    after.append(copy.deepcopy(persistent))
     with pytest.raises(ValueError, match='Unexpected persistent resource'):
         deployment.validate(before, after, ECR, TAG)
-    before.append(hook)
+    before.append(persistent)
     deployment.validate(before, after, ECR, TAG)
 
 
@@ -293,3 +296,15 @@ def test_dashboard_image_is_not_silently_upgraded(release):
     deployment.pod(after[2])["containers"][0]["image"] = "dashboard:new"
     with pytest.raises(ValueError, match="Dashboard image"):
         deployment.validate(before, after, ECR, TAG)
+
+
+def test_dev_values_enable_registrant_authentication_with_the_new_dev_hosts(release):
+    before, _ = release
+    values = {"global": {"registryHostname": "farmer-registry.development.oanstaging.com"}}
+    result = deployment.prepare(values, before, ECR, TAG)
+    assert result["registrantAuth"]["enabled"] is True
+    assert result["registrantAuth"]["esignetBaseUrl"] == "https://esignet.development.oanstaging.com"
+    assert result["registrantAuth"]["callbackUrl"].endswith("/registrant-auth/callback")
+    assert "registrantAuth" not in deployment.prepare(
+        {"global": {"registryHostname": "farmer-registry.oanstaging.com"}}, before, ECR, TAG,
+        environment="staging", images={c: {"tag": TAG, "digest": "sha256:" + "b" * 64} for _, _, c in deployment.COMPONENTS.values()})

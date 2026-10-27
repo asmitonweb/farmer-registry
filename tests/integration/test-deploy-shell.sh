@@ -8,6 +8,7 @@ cat > "$TEST_ROOT/bin/docker" <<'MOCK'
 #!/bin/sh
 printf '%s\n' "$*" >> "$GUARD_CALLS"
 case "$*" in
+  *'oan_chart.py require-deployable '*) exit "${TEST_PROMOTION_EXIT:-0}" ;;
   *upgrade-mode*) printf '%s\n' "$TEST_MODE" ;;
   *'oan_chart.py url'*) printf 'https://approved.example/chart.tgz\n' ;;
   *'oan_chart.py verify '*) exit "${TEST_VERIFY_EXIT:-0}" ;;
@@ -24,6 +25,11 @@ if [ "$1" = upgrade ]; then exit "$TEST_UPGRADE_EXIT"; fi
 MOCK
 cat > "$TEST_ROOT/bin/kubectl" <<'MOCK'
 #!/bin/sh
+exit 0
+MOCK
+cat > "$TEST_ROOT/bin/python3" <<'MOCK'
+#!/bin/sh
+printf '%s\n' "$*" >> "$GUARD_CALLS"
 exit 0
 MOCK
 chmod +x "$TEST_ROOT/bin/"*
@@ -82,13 +88,13 @@ for TEST_MODE in normal recovery; do
 done
 done
 export TEST_UPGRADE_EXIT=0 TEST_MODE=normal APPLY_COMMONS_IDENTITY=false
-for gate in download verify; do
-  export TEST_DOWNLOAD_EXIT=0 TEST_VERIFY_EXIT=0
-  if [[ "$gate" = download ]]; then export TEST_DOWNLOAD_EXIT=1; else export TEST_VERIFY_EXIT=1; fi
+for gate in promotion download verify; do
+  export TEST_DOWNLOAD_EXIT=0 TEST_VERIFY_EXIT=0 TEST_PROMOTION_EXIT=0
+  case "$gate" in promotion) export TEST_PROMOTION_EXIT=1 ;; download) export TEST_DOWNLOAD_EXIT=1 ;; verify) export TEST_VERIFY_EXIT=1 ;; esac
   : > "$HELM_CALLS"
   if bash ci/deploy/deploy-dev.sh > "$TEST_ROOT/output" 2>&1; then
     echo 'Failed OAN package gate was accepted'; exit 1
   fi
   if grep -Eq '^upgrade |^lint |^template ' "$HELM_CALLS"; then exit 1; fi
 done
-echo 'PASS: download/checksum failures stop before any chart use'
+echo 'PASS: environment/download/checksum failures stop before any chart use'
